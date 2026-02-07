@@ -1,0 +1,17 @@
+---
+description: "Use when editing UI, layout, or motion in app or components. FediChess design principles and typography."
+globs: ["app/**/*.tsx", "app/**/*.css", "components/**/*.tsx", "components/**/*.css"]
+alwaysApply: false
+---
+
+# FediChess design
+
+Apply these principles when changing UI, layout, or motion:
+
+- **Simplicity**: One primary focus per view. Use tray/overlay flows for secondary actions (e.g. settings, copy link). Progressive disclosure; avoid crowding the main screen.
+- **Fluidity**: Smooth, purposeful transitions (e.g. view changes, modals). Reuse or morph elements for continuity. Avoid static jumps and redundant or decorative animation.
+- **Delight**: Polish and small surprises in high-impact moments (e.g. landing CTA, move confirmation, game end). Avoid sprinkling motion everywhere; follow a delight–impact curve.
+
+**Typography**: Instrument Serif for brand and headings. Keep body text in a neutral sans for readability.
+
+**Reference**: For typography, color, and motion details see `.agents/skills/frontend-design/SKILL.md`. Use FediChess design principles as the project design language.

@@ -1,4 +1,4 @@
-# Contributing to P2P Chess
+# Contributing to FediChess
 
 Thanks for your interest in contributing.
 

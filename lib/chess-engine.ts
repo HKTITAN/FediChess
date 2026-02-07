@@ -1,3 +1,7 @@
+/**
+ * Chess game logic: create game, apply moves, derive FEN and game status.
+ * Uses chess.js for rules; exports types and helpers for the board and P2P event log.
+ */
 import { Chess } from "chess.js";
 
 export type PieceSymbol = "p" | "n" | "b" | "r" | "q" | "k";

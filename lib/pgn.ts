@@ -22,8 +22,8 @@ export function buildPgn(params: {
           : "*";
 
   const headers = [
-    `[Event "P2P Chess Game"]`,
-    `[Site "P2P Chess"]`,
+    `[Event "FediChess Game"]`,
+    `[Site "FediChess"]`,
     `[Date "${date}"]`,
     `[White "${escapePgnString(whiteName)}"]`,
     `[Black "${escapePgnString(blackName)}"]`,

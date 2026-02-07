@@ -1,0 +1,15 @@
+---
+description: "Use when adding or changing P2P message types, payloads, or wire protocol. Keeps protocol and docs in sync."
+globs: ["lib/p2p.ts", "documentation/protocol.md", "app/game/**/*.tsx", "app/lobby/**/*.tsx", "lib/store.ts"]
+alwaysApply: false
+---
+
+# Protocol and documentation sync
+
+The wire protocol is defined in **documentation/protocol.md**. When you add or change message types or payloads:
+
+1. **Types**: Update type definitions in `lib/p2p.ts` (or shared types used by P2P and stores).
+2. **Docs**: Update `documentation/protocol.md` to match (message names, fields, when sent, who sends).
+3. **Handlers**: Ensure lobby and game code (e.g. in `lib/store.ts` or components that use `lib/p2p.ts`) handle the message—send and/or receive as required.
+
+This keeps the protocol and documentation in sync and avoids drift between code and docs.

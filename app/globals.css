@@ -55,6 +55,21 @@ body {
   background: var(--background);
 }
 
+/* Smooth view transitions: avoid static jumps between routes */
+@media (prefers-reduced-motion: no-preference) {
+  main {
+    animation: fadeIn 0.2s ease-out;
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Chess board squares - react-chessboard uses data attributes */
 [data-square="true"] {
   transition: background 0.2s;

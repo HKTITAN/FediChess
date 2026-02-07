@@ -1,8 +1,10 @@
-# P2P Chess — Architecture
+# FediChess — Architecture
+
+Documentation index: [README.md](README.md).
 
 ## High-level overview
 
-P2P Chess is a decentralized multiplayer chess application. There is no central game server: peers discover each other via public (or self-hosted) WebTorrent trackers and then communicate over WebRTC data channels.
+FediChess is a decentralized multiplayer chess application. There is no central game server: peers discover each other via public (or self-hosted) WebTorrent trackers and then communicate over WebRTC data channels.
 
 ```mermaid
 flowchart LR

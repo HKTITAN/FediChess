@@ -1,0 +1,17 @@
+---
+description: "Use when editing lib or app. Next.js static export, React 19, Zustand, Trystero/WebRTC, chess.js."
+globs: ["lib/**/*.ts", "lib/**/*.tsx", "app/**/*.tsx"]
+alwaysApply: false
+---
+
+# FediChess stack
+
+- **UI**: Next.js 15 (static export), React 19, Tailwind.
+- **P2P**: Trystero (torrent strategy), WebTorrent trackers, WebRTC data channels.
+- **Game**: chess.js (rules), react-chessboard (board UI).
+- **State**: Zustand (user, lobby, game, UI in `lib/store.ts`).
+- **Persistence**: IndexedDB via idb-keyval (ELO, name, game history).
+
+**Static export**: No server-only APIs (e.g. no Route Handlers that rely on server). All state is client-side (Zustand, P2P).
+
+**Architecture**: See [documentation/architecture.md](documentation/architecture.md) for data flow and stack details.

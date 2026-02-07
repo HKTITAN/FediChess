@@ -1,0 +1,14 @@
+---
+description: "Use when writing or refactoring code. TypeScript, components, naming, state location."
+alwaysApply: false
+---
+
+# FediChess conventions
+
+- **TypeScript**: Strict mode. Prefer explicit types for public APIs and message payloads.
+- **Components**: Functional components only. Use hooks for state and side effects.
+- **Imports**: Use path alias `@/` (e.g. `@/components/ui/button`, `@/lib/store`).
+- **Naming**: Components PascalCase. Files kebab-case or match component name (e.g. `ChessBoard.tsx` in `components/game/`).
+- **State**: Centralized in `lib/store.ts` (Zustand). Game and lobby state synced via P2P event log; see `documentation/architecture.md`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution and style guidance.

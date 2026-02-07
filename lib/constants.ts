@@ -1,3 +1,7 @@
+/**
+ * P2P and app constants: trackers, app id, lobby room, ELO defaults, timers.
+ * Override trackers via NEXT_PUBLIC_P2P_TRACKERS; STUN/TURN via NEXT_PUBLIC_STUN_URL etc.
+ */
 // WebTorrent-compatible WSS trackers (working as of 2026). Override via NEXT_PUBLIC_P2P_TRACKERS (comma-separated) for self-hosted/fediverse.
 const DEFAULT_P2P_TRACKERS = [
   "wss://tracker.webtorrent.dev",

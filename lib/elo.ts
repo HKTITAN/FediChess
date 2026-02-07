@@ -1,3 +1,6 @@
+/**
+ * ELO calculation and persistence: update ELO from game results, persist to IndexedDB, load game history.
+ */
 import { get, set } from "idb-keyval";
 import { DEFAULT_ELO } from "./constants";
 

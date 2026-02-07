@@ -1,4 +1,4 @@
-# P2P Chess
+# FediChess
 
 **Decentralized P2P chess — the fediverse of chess.** Play in the browser or build your own client with the [open protocol](documentation/protocol.md) and SDKs. No central server: matchmaking via WebTorrent trackers, real-time moves over WebRTC.
 
@@ -47,6 +47,8 @@ Optional: set `NEXT_PUBLIC_P2P_TRACKERS` to a comma-separated list of WSS tracke
 Or share the lobby link from Tab 1; Tab 2 pastes it to join the same room.
 
 ## Documentation
+
+Full index: [documentation/README.md](documentation/README.md).
 
 - [Architecture](documentation/architecture.md) — high-level design, data flow, Discovery/NAT (STUN/TURN), comparison with Chess.com and Lichess.
 - [Protocol](documentation/protocol.md) — wire protocol: rooms, action types, payloads, flows.

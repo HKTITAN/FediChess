@@ -1,3 +1,7 @@
+/**
+ * P2P layer: Trystero (torrent strategy), rooms, and action types/payloads for lobby and game.
+ * Wire protocol is documented in documentation/protocol.md. Exports room helpers and payload types.
+ */
 import {
   P2P_APP_ID,
   P2P_TRACKERS,

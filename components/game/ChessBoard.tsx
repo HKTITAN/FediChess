@@ -1,5 +1,6 @@
 "use client";
 
+/** Game board: react-chessboard wrapper with FEN, orientation, move callback, and classic/neon theme. */
 import * as React from "react";
 import { Chessboard } from "react-chessboard";
 import { makeMove, validateFen, getGameStatus } from "@/lib/chess-engine";

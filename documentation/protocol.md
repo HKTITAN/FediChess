@@ -1,6 +1,6 @@
-# P2P Chess Wire Protocol
+# FediChess Wire Protocol
 
-This document defines the wire protocol used by P2P Chess clients. Any client (web, mobile, CLI, or other platform) that implements this protocol can discover peers, send and receive challenges, and play games interoperably.
+This document defines the wire protocol used by FediChess clients. Any client (web, mobile, CLI, or other platform) that implements this protocol can discover peers, send and receive challenges, and play games interoperably.
 
 ## Transport
 

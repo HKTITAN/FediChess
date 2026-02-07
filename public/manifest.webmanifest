@@ -1,10 +1,1 @@
-{
-  "name": "P2P Chess",
-  "short_name": "P2P Chess",
-  "description": "Play chess peer-to-peer, no servers",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#0f0f0f",
-  "theme_color": "#0f0f0f",
-  "icons": []
-}
+{"name":"FediChess","short_name":"FediChess","description":"Play chess peer-to-peer, no servers","start_url":"/","display":"standalone","background_color":"#0f0f0f","theme_color":"#0f0f0f","icons":[]}

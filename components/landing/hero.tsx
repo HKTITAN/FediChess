@@ -1,5 +1,6 @@
 "use client";
 
+/** Landing hero: title, Play Random / Copy Link / Local AI, theme toggles. */
 import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -28,11 +29,12 @@ export function Hero() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
-      <div className="absolute top-4 right-4 flex gap-2">
+      {/* Secondary actions in a compact tray: one primary focus (Play) below */}
+      <div className="absolute top-4 right-4 flex gap-2 rounded-lg border border-border/50 bg-background/80 px-2 py-1.5 backdrop-blur-sm">
         <button
           type="button"
           onClick={() => setColorTheme(colorTheme === "dark" ? "light" : "dark")}
-          className="rounded px-3 py-1 text-sm text-muted-foreground hover:text-foreground"
+          className="rounded px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
           aria-label="Toggle theme"
         >
           {colorTheme === "dark" ? "☀️" : "🌙"}
@@ -42,22 +44,22 @@ export function Hero() {
           onClick={() =>
             setChessTheme(chessTheme === "neon" ? "classic" : "neon")
           }
-          className="rounded px-3 py-1 text-sm text-muted-foreground hover:text-foreground"
+          className="rounded px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
           aria-label="Toggle chess theme"
         >
           {chessTheme === "neon" ? "♟ Classic" : "✨ Neon"}
         </button>
       </div>
 
-      <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-        Play P2P Chess Free
+      <h1 className="font-instrument text-4xl font-bold tracking-tight md:text-5xl">
+        FediChess
       </h1>
       <p className="mt-2 text-muted-foreground">
         No servers. Peer-to-peer over WebRTC. Match with players near your ELO.
       </p>
 
       <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-        <Button size="lg" asChild>
+        <Button size="lg" asChild className="transition-transform duration-200 hover:scale-[1.02]">
           <Link href={`/lobby?room=${encodeURIComponent(LOBBY_ROOM)}#elo=${elo}`}>
             Play Random
           </Link>

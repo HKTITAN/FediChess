@@ -1,5 +1,6 @@
 "use client";
 
+/** In-game chat: message list and send input with optional quick emotes. */
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

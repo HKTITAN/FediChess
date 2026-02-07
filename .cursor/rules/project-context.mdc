@@ -1,0 +1,18 @@
+---
+description: "FediChess project context. Use always so every chat knows the project and where to look."
+globs: []
+alwaysApply: true
+---
+
+# FediChess — project context
+
+- **Project**: FediChess (decentralized P2P chess; no central server).
+- **Stack**: Next.js 15 (static export), React 19, Tailwind, Zustand, Trystero/WebRTC, chess.js.
+- **Where to look**:
+  - Architecture and protocol: `documentation/architecture.md`, `documentation/protocol.md`
+  - Game logic: `lib/chess-engine.ts`
+  - P2P and wire protocol: `lib/p2p.ts`
+  - State (user, lobby, game, UI): `lib/store.ts`
+  - Routes: `app/` (page.tsx per route); components: `components/` (game, landing, ui)
+- **Path alias**: `@/` (e.g. `@/components/ui/button`, `@/lib/store`).
+- **Design**: FediChess design principles (simplicity, fluidity, delight) are the project design language.

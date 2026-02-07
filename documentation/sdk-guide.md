@@ -1,6 +1,6 @@
 # SDK guide — building clients in any language
 
-This guide explains how to build a P2P Chess client in any language (JavaScript/TypeScript, Python, Go, Rust, etc.) so it can discover peers, send and receive challenges, and play games with the reference web app and other compatible clients.
+This guide explains how to build a FediChess client in any language (JavaScript/TypeScript, Python, Go, Rust, etc.) so it can discover peers, send and receive challenges, and play games with the reference web app and other compatible clients.
 
 ## Prerequisites
 

@@ -1,3 +1,7 @@
+/**
+ * Global client state: user (ELO, name), lobby (peers, challenges), game (board, log, timers), UI (theme).
+ * Zustand store; game state is synced via P2P event log (see documentation/architecture.md).
+ */
 import { create } from "zustand";
 import { DEFAULT_ELO } from "./constants";
 import { getGameStatus } from "./chess-engine";
