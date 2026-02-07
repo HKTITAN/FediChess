@@ -1,6 +1,8 @@
 # FediChess
 
-**Decentralized peer-to-peer chess in the browser — the fediverse of chess.** Play with anyone over the web without a central game server, or build your own client using the [open wire protocol](documentation/protocol.md). Matchmaking uses public WebTorrent trackers; moves and chat go directly between peers over WebRTC.
+**Decentralized peer-to-peer chess in the browser — the fediverse of chess.** Play with anyone over the web without a central game server, or **nearby over BLE** with no internet. Same [open wire protocol](documentation/protocol.md) over **WebRTC** (online) and **BLE** (local); build your own client and interoperate. Matchmaking uses public WebTorrent trackers for online play; moves and chat go directly between peers.
+
+**Version:** 0.3.0 — see [CHANGELOG](CHANGELOG.md) for release history.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/HKTITAN/fedichess)
 
@@ -19,6 +21,7 @@
 - [Deployment](#deployment)
 - [Project structure](#project-structure)
 - [Documentation](#documentation)
+- [Transports](#transports)
 - [Building other clients](#building-other-clients)
 - [Ranking and federation](#ranking-and-federation)
 - [Contributing](#contributing)
@@ -53,7 +56,7 @@
 
 ### UX
 
-- **Classic and Neon themes** — Toggle board/UI themes. Mobile-responsive layout.
+- **Classic and Neon themes** — Toggle board/UI themes. Mobile-responsive layout, 44px touch targets, safe-area padding.
 - **Local AI** — Play vs a simple built-in engine (random legal moves) from the home page. For strong engine play, you can integrate e.g. Stockfish.wasm in a Web Worker.
 
 ---
@@ -65,7 +68,7 @@
 3. **Game room** — On accept, both clients join a game room `p2p-chess-{gameId}` over the same P2P layer. Each move and game event is broadcast as a shared event log; board state is derived by replaying the log so spectators and late joiners see the same position.
 4. **WebRTC** — After discovery, peers connect directly (or via TURN if configured). All game data (moves, chat, sync) flows over WebRTC data channels — no server in the middle.
 
-See [Architecture](documentation/architecture.md) for data flow, state, and security notes.
+**Dual transport:** The same protocol also runs over **BLE** (Web Bluetooth) for nearby play — see [Transports](#transports) and [Protocol (BLE)](documentation/protocol.md#2-ble-web-bluetooth). [Architecture](documentation/architecture.md) has diagrams, data flow, and stability (disconnect, refresh).
 
 ---
 
@@ -73,13 +76,13 @@ See [Architecture](documentation/architecture.md) for data flow, state, and secu
 
 | Layer        | Technology | Notes |
 |-------------|------------|--------|
-| **UI**      | Next.js 15, React 19, TailwindCSS | App Router, static export. |
-| **P2P**     | Trystero (torrent strategy), WebTorrent trackers, WebRTC | Discovery + signaling via trackers; data over WebRTC. |
+| **UI**      | Next.js 15, React 19, TailwindCSS | App Router, static export; responsive, touch-friendly. |
+| **P2P**     | Trystero (torrent), WebTorrent trackers, WebRTC; **BLE** (Web Bluetooth) | **Online:** discovery/signaling via trackers, data over WebRTC. **Nearby:** BLE GATT (see `lib/ble-transport.ts`). Shared `Room` interface in `lib/transport-types.ts`. |
 | **Game**    | chess.js, react-chessboard | Rules, FEN, move validation; board component. |
-| **State**   | Zustand | User, lobby, game, UI state in a single store. |
+| **State**   | Zustand | User, lobby, game, UI state; peers tagged by transport (webrtc/ble). |
 | **Persistence** | IndexedDB (idb-keyval) | ELO, peak ELO, game history. Optional localStorage for name and preferences. |
 
-- **Package name:** `chess-p2p` (npm/repo). **Product name:** FediChess.
+- **Package name:** `fedichess` (npm/repo). **Product name:** FediChess. **Version:** 0.3.0.
 
 ---
 
@@ -162,6 +165,12 @@ NEXT_PUBLIC_STUN_URL=stun:stun.l.google.com:19302
 2. The other person opens the link in their browser and joins the same lobby.
 3. Challenge and accept as above.
 
+### Nearby (BLE)
+
+1. **Lobby:** Click **Connect via BLE** (Chrome or Edge; HTTPS or localhost). Select a FediChess BLE device when the picker appears.
+2. The other device appears as a **Nearby** peer. Challenge and accept as usual; the game runs over the same BLE connection.
+3. **Note:** The browser can only act as a **central** (client). The other side must advertise the FediChess GATT service (e.g. a native app or a separate BLE peripheral). Two browser tabs cannot connect to each other via BLE alone.
+
 ### Local AI
 
 Click **Local AI** on the home page to play vs a simple engine (random legal moves). No P2P involved.
@@ -195,9 +204,10 @@ The manifest uses the favicon as a fallback. For a better "Add to home screen" e
 | Path | Purpose |
 |------|---------|
 | `app/` | Next.js App Router: `page.tsx` (home), `lobby/page.tsx`, `game/page.tsx`, `local/page.tsx`, `layout.tsx`, `globals.css`. |
-| `components/` | React components: `game/` (board, chat, timer, move history), `landing/hero.tsx`, `ui/` (button, card, dialog, input), `theme-provider.tsx`. |
-| `lib/` | Core logic: `chess-engine.ts` (rules, FEN), `p2p.ts` (Trystero, rooms, actions), `store.ts` (Zustand state), `elo.ts`, `pgn.ts`, `constants.ts`. |
-| `documentation/` | Architecture, protocol, SDK guide, ranking API, and [documentation index](documentation/README.md). |
+| `components/` | React components: `game/` (board, chat, timer, move history), `landing/hero.tsx`, `ui/` (button, card, dialog, input), `theme-provider.tsx`, `error-boundary.tsx`. |
+| `lib/` | Core logic: `chess-engine.ts` (rules, FEN), `p2p.ts` (Trystero + BLE helpers), `ble-transport.ts` (BLE GATT room), `transport-types.ts` (Room interface), `store.ts`, `elo.ts`, `pgn.ts`, `constants.ts`, `clipboard.ts`. |
+| `types/` | TypeScript: `web-bluetooth.d.ts` (Web Bluetooth API for BLE). |
+| `documentation/` | [Index](documentation/README.md), architecture, protocol, SDK guide, ranking API. |
 | `public/` | Static assets and `manifest.webmanifest`. |
 
 Full “where to find what” map: [documentation/README.md](documentation/README.md).
@@ -209,11 +219,22 @@ Full “where to find what” map: [documentation/README.md](documentation/READM
 | Document | Description |
 |----------|-------------|
 | [documentation/README.md](documentation/README.md) | **Index** — quick links and map of the codebase. |
-| [Architecture](documentation/architecture.md) | High-level design, data flow (lobby, game, state), discovery/NAT (STUN/TURN), security, comparison with Chess.com/Lichess. |
-| [Protocol](documentation/protocol.md) | **Wire protocol** — rooms, action types (≤12 bytes), JSON payloads, lobby and game flows. Required for building other clients. |
+| [Architecture](documentation/architecture.md) | High-level design, **transports (WebRTC + BLE)**, diagrams, data flow, state, discovery/NAT, stability (disconnect, refresh), security. |
+| [Protocol](documentation/protocol.md) | **Wire protocol** — transports (WebRTC, BLE), rooms, action types (≤12 bytes), JSON payloads, lobby and game flows. Required for building other clients. |
 | [SDK guide](documentation/sdk-guide.md) | How to build FediChess clients in other languages (JS/TS, Python, Go, Rust) and interoperate with this app. |
 | [Ranking API](documentation/ranking-api.md) | Optional voluntary ranking service: submit results, leaderboard. User consent and configurable. |
-| [CHANGELOG](CHANGELOG.md) | Version history and release notes. |
+| [CHANGELOG](CHANGELOG.md) | Version history and release notes (current: 0.3.0). |
+
+---
+
+## Transports
+
+| Transport | Discovery | Data | Scope | Use case |
+|-----------|-----------|------|--------|----------|
+| **WebRTC** | WebTorrent trackers (WSS), Trystero | WebRTC data channels | Many peers per room; lobby + game rooms | Online play, spectators |
+| **BLE** | Web Bluetooth device picker (FediChess GATT service) | GATT characteristic (length-prefixed `actionName` + JSON) | 1:1 per connection | Nearby play, no internet |
+
+Same [protocol](documentation/protocol.md): rooms, action names, JSON payloads. Only the wire and discovery differ. Peers discovered over WebRTC are challenged over WebRTC; peers discovered over BLE are challenged over BLE. The game page uses the same Room interface for both.
 
 ---
 
@@ -221,8 +242,8 @@ Full “where to find what” map: [documentation/README.md](documentation/READM
 
 The [wire protocol](documentation/protocol.md) is the source of truth. Any client that implements the same rooms, app ID, action names, and JSON payloads can discover peers, send challenges, and play games with this web app and other compatible clients.
 
-- **JavaScript/TypeScript:** This repo is the reference. Use Trystero (torrent strategy), same trackers and app ID, and the action names/payloads from the protocol doc. See [SDK guide](documentation/sdk-guide.md).
-- **Other languages:** Use a WebRTC + WebTorrent library in your language, or a small Node/JS bridge that joins rooms and forwards protocol messages. Protocol and payload shapes are in [protocol.md](documentation/protocol.md).
+- **JavaScript/TypeScript:** This repo is the reference. **WebRTC:** Use Trystero (torrent strategy), same trackers and app ID. **BLE:** Implement the FediChess GATT service (see protocol doc for UUIDs and message format) or use `lib/ble-transport.ts` as reference. See [SDK guide](documentation/sdk-guide.md).
+- **Other languages:** Use a WebRTC + WebTorrent library for online play; for BLE, implement the same GATT service and message encoding. Protocol and payload shapes are in [protocol.md](documentation/protocol.md).
 
 Community clients that implement the protocol can be listed in this README (open an issue or PR).
 

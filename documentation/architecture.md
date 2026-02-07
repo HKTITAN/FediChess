@@ -4,7 +4,34 @@ Documentation index: [README.md](README.md).
 
 ## High-level overview
 
-FediChess is a decentralized multiplayer chess application. There is no central game server: peers discover each other via public (or self-hosted) WebTorrent trackers and then communicate over WebRTC data channels.
+FediChess is a decentralized multiplayer chess application. There is no central game server. The same **wire protocol** (rooms, action names, JSON payloads) runs over two **transports**: **WebRTC** (online, many peers) and **BLE** (nearby, 1:1). Lobby and game code use a shared **Room** interface so both transports are handled uniformly.
+
+### Transport abstraction
+
+```mermaid
+flowchart LR
+  subgraph app [App]
+    Lobby[Lobby page]
+    Game[Game page]
+  end
+  subgraph room [Room interface]
+    R[makeAction getPeers onPeerJoin onPeerLeave leave]
+  end
+  subgraph impl [Implementations]
+    WebRTC[Trystero WebRTC]
+    BLE[BLE GATT]
+  end
+  Lobby --> R
+  Game --> R
+  R --> WebRTC
+  R --> BLE
+```
+
+- **Room** (`lib/transport-types.ts`): `makeAction(name) → [send, get]`, `getPeers()`, `onPeerJoin`, `onPeerLeave`, `leave()`. Same API for lobby and game.
+- **WebRTC** (`lib/p2p.ts`): Trystero rooms; discovery via trackers; data over WebRTC data channels.
+- **BLE** (`lib/ble-transport.ts`): One GATT connection = one peer; length-prefixed messages; stored room when navigating lobby → game.
+
+### WebRTC (online)
 
 ```mermaid
 flowchart LR
@@ -23,34 +50,49 @@ flowchart LR
   A <-->|WebRTC data channel| B
 ```
 
-- **Trackers**: WebSocket (WSS) to WebTorrent-compatible trackers. Used only for discovery/signaling (finding peers and exchanging WebRTC offers/answers). Default list can be overridden via `NEXT_PUBLIC_P2P_TRACKERS`.
-- **WebRTC**: After discovery, peers connect directly (or via TURN if configured) and send game messages over data channels.
+- **Trackers**: WebSocket (WSS) to WebTorrent-compatible trackers. Used only for discovery/signaling. Default list overridden via `NEXT_PUBLIC_P2P_TRACKERS`.
+- **WebRTC**: After discovery, peers connect directly (or via TURN) and send game messages over data channels.
+
+### BLE (nearby)
+
+```mermaid
+flowchart LR
+  subgraph central [Browser Central]
+    App[FediChess app]
+  end
+  subgraph peripheral [BLE peripheral]
+    Dev[FediChess GATT device]
+  end
+  App <-->|GATT read/notify/write| Dev
+```
+
+- **Role**: The web app is a **central** only (initiates connection). The other side must be a **peripheral** advertising the FediChess GATT service (service UUID and characteristic UUID in [protocol.md](protocol.md)).
+- **Scope**: 1:1. Lobby = one BLE peer; game = same connection. Stored in memory when navigating lobby → game so the game page reuses it.
+- **Message format**: Length-prefixed (4 bytes) + `actionName` + newline + JSON. Same action names and payloads as WebRTC.
 
 ## Stack
 
 | Layer      | Technology |
 |-----------|------------|
 | UI        | Next.js 15 (static export), React 19, TailwindCSS |
-| P2P       | Trystero (torrent strategy), WebTorrent trackers, WebRTC |
+| P2P       | Trystero (torrent), WebTorrent trackers, WebRTC; BLE via Web Bluetooth (`lib/ble-transport.ts`). Shared Room interface (`lib/transport-types.ts`). |
 | Game      | chess.js (rules), react-chessboard (board UI) |
-| State     | Zustand (user, lobby, game, UI) |
+| State     | Zustand (user, lobby, game, UI); peers tagged by `transport: 'webrtc' \| 'ble'` |
 | Persistence | IndexedDB via idb-keyval (ELO, name, game history) |
 
 ## Data flow
 
 ### Lobby
 
-1. Client joins lobby room (e.g. `p2p-chess-global`) via Trystero.
-2. Client sends periodic **heartbeat** (ELO, username, ready, timestamp); receives heartbeats from others and updates peer list.
-3. User selects a peer and sends **challenge** (gameId, color, challenger name/ELO) to that peer.
-4. Other peer sends **challResp** (accept/decline). On accept, both clients navigate to the game URL and join the game room `p2p-chess-{gameId}`.
+- **WebRTC**: Client joins lobby room (e.g. `p2p-chess-global`) via Trystero. Sends periodic **heartbeat**; receives others'; peer list tagged **Online**. Challenge and **challResp** over the same room.
+- **BLE**: User clicks "Connect via BLE"; device picker; connect to FediChess GATT device. Heartbeats over BLE; one peer appears as **Nearby**. Challenge and **challResp** over the same BLE connection. On accept, app stores the BLE room and navigates to game with `transport=ble`.
 
 ### Game
 
-1. Clients join the game room as **player** (with `color=w` or `color=b`) or **spectator** (e.g. `spectate=1` or no color). Each joiner sends a **role** message so all peers know `whitePeerId` and `blackPeerId`. Only those two peers may send **move** and **gameEvent**; spectators are read-only.
-2. **Shared event log**: Each move or game event is broadcast as a **history** payload (with monotonic `seq`). All participants receive the same log; late joiners receive the full log via **histSync**. Board state (FEN, moveHistory, result) is derived by replaying the log in order.
-3. **White** sends **sync** (initial FEN) and **histSync** (full log when non-empty) to new joiners so players and spectators see the same state.
-4. Chat: any participant may send **chat**.
+- **WebRTC**: Both join `p2p-chess-{gameId}` via Trystero. **Role**, **move**, **chat**, **gameEvent**, **sync**, **history**, **histSync** as in protocol.
+- **BLE**: Game page reads `transport=ble` from URL; retrieves stored BLE room (set when accepting in lobby). Same actions over the single BLE link; `selfPeerId` is session-stable (from `createBleRoom`).
+
+Common flow: (1) Join room (WebRTC or BLE). (2) Send **role** (player/spectator, color); only the two players may send **move** and **gameEvent**. (3) **Shared event log** via **history** (monotonic `seq`); late joiners get **histSync**. (4) **White** sends **sync** and **histSync** to new joiners. (5) Chat: any participant.
 
 ### State
 
@@ -63,9 +105,17 @@ flowchart LR
 
 ## Discovery and NAT
 
-- **Trackers**: Required for peers to find each other. The app uses multiple WSS trackers for redundancy. If all trackers are unreachable, no discovery is possible. Operators can run their own WebTorrent-compatible tracker (e.g. [bittorrent-tracker](https://github.com/webtorrent/bittorrent-tracker)) and set `NEXT_PUBLIC_P2P_TRACKERS`.
-- **STUN/TURN**: Optional NAT traversal is supported via environment variables. Set `NEXT_PUBLIC_STUN_URL` (e.g. `stun:stun.l.google.com:19302`) and optionally `NEXT_PUBLIC_TURN_URL`, `NEXT_PUBLIC_TURN_USERNAME`, `NEXT_PUBLIC_TURN_CREDENTIAL` so WebRTC can connect behind strict NATs or firewalls. The P2P layer passes these as `rtcConfig.iceServers` to Trystero when set.
-- **Connection tips**: If connections fail, try another network, allow WebRTC in the browser/firewall, or use a VPN. Running your own TURN server improves reliability for users behind symmetric NAT.
+- **WebRTC — Trackers**: Required for online peers to find each other. Multiple WSS trackers for redundancy. Run your own WebTorrent-compatible tracker and set `NEXT_PUBLIC_P2P_TRACKERS`.
+- **WebRTC — STUN/TURN**: Optional. Set `NEXT_PUBLIC_STUN_URL` and optionally `NEXT_PUBLIC_TURN_*` so WebRTC works behind strict NATs. Passed as `rtcConfig.iceServers` to Trystero.
+- **BLE**: No trackers. User triggers "Connect via BLE"; browser shows device picker filtered by FediChess service UUID. The other side must advertise that service (native app or peripheral). Chrome/Edge on HTTPS or localhost.
+
+## Stability and edge cases
+
+- **BLE disconnect (lobby)**: On peer leave, the app clears the heartbeat timer, BLE room ref, and removes the BLE peer from the list. If the pending challenge was from that peer, it is cleared and the user sees "Disconnected from nearby device." Accept/decline is guarded: if transport is BLE and the BLE room is gone, the challenge is cleared with a message instead of falling back to WebRTC.
+- **BLE disconnect (game)**: `onPeerLeave` clears the stored BLE room and `gameRoomRef` before showing "You Win". Refresh or re-entry then sees "BLE game not found" instead of a dead reference.
+- **Page refresh**: **Lobby** — WebRTC re-joins; BLE connection is lost (no persistence). **Game (WebRTC)** — Re-join gives a new peer id; opponent may see leave and get a win. **Game (BLE)** — Stored room is in memory only; after refresh, `getGameRoomBle` returns null and the app shows an error.
+- **Cleanup**: Lobby unmount calls `clearBleLobby()` (timer + leave room + clear ref). Game unmount calls `leaveRoom` (WebRTC) or `clearStoredBleGameRoom()` (BLE). `clearStoredBleGameRoom()` nulls storage first then calls `room.leave()` in try/catch so it is safe to call multiple times.
+- **Challenge/accept over BLE**: If the user accepts a BLE challenge after the BLE device disconnected, the app detects missing BLE room and does not send over WebRTC; it clears the challenge and shows an error.
 
 ## Security and limitations
 
