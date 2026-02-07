@@ -9,6 +9,10 @@ import {
   getGameRoom,
   leaveRoom,
   getShareableLink,
+  getLobbyRoomBle,
+  storeBleGameRoom,
+  isBleSupported,
+  requestBleDevice,
 } from "@/lib/p2p";
 import { copyToClipboard } from "@/lib/clipboard";
 import type {
@@ -60,6 +64,27 @@ function LobbyContent() {
   const [p2pError, setP2pError] = React.useState<string | null>(null);
   const [link, setLink] = React.useState("");
   const [challengingId, setChallengingId] = React.useState<string | null>(null);
+  const [bleConnecting, setBleConnecting] = React.useState(false);
+  const [bleConnected, setBleConnected] = React.useState(false);
+  const [bleError, setBleError] = React.useState<string | null>(null);
+  const [pendingChallengeTransport, setPendingChallengeTransport] = React.useState<"webrtc" | "ble" | null>(null);
+  const bleLobbyRoomRef = React.useRef<{ room: Awaited<ReturnType<typeof getLobbyRoomBle>>["room"]; selfPeerId: string } | null>(null);
+  const bleHeartbeatTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearBleLobby = React.useCallback(() => {
+    if (bleHeartbeatTimerRef.current) {
+      clearInterval(bleHeartbeatTimerRef.current);
+      bleHeartbeatTimerRef.current = null;
+    }
+    const ble = bleLobbyRoomRef.current;
+    if (ble) {
+      ble.room.leave();
+      bleLobbyRoomRef.current = null;
+    }
+    setBleConnected(false);
+    setBleError(null);
+    useLobbyStore.getState().peers.filter((p) => p.transport === "ble").forEach((p) => removePeer(p.id));
+  }, [removePeer]);
 
   React.useEffect(() => {
     hydrateFromStorage();
@@ -99,12 +124,14 @@ function LobbyContent() {
             name: String(d.name ?? "Player"),
             ready: Boolean(d.ready),
             timestamp: Number(d.timestamp ?? 0),
+            transport: "webrtc",
           });
       });
 
       getChallenge((data: unknown, peerId: string) => {
         const d = data as ChallengePayload;
         if (!mounted || !d) return;
+        setPendingChallengeTransport("webrtc");
         setPendingChallenge({
           gameId: d.gameId,
           challengerId: peerId,
@@ -166,6 +193,118 @@ function LobbyContent() {
     };
   }, [roomParam, elo, name, addOrUpdatePeer, removePeer, setPendingChallenge]);
 
+  const connectBle = React.useCallback(async () => {
+    setBleError(null);
+    setBleConnecting(true);
+    try {
+      if (bleLobbyRoomRef.current) clearBleLobby();
+      const device = await requestBleDevice();
+      const { room, selfPeerId } = await getLobbyRoomBle(device);
+      bleLobbyRoomRef.current = { room, selfPeerId };
+      const [sendHeartbeat, getHeartbeat] = room.makeAction("heartbeat");
+      const [sendChallenge, getChallenge] = room.makeAction("challenge");
+      const [sendChallengeResponse, getChallengeResponse] = room.makeAction("challResp");
+
+      getHeartbeat((data: unknown, peerId: string) => {
+        const d = data as HeartbeatPayload;
+        if (d && typeof d.elo === "number")
+          addOrUpdatePeer({
+            id: peerId,
+            elo: d.elo,
+            name: String(d.name ?? "Player"),
+            ready: Boolean(d.ready),
+            timestamp: Number(d.timestamp ?? 0),
+            transport: "ble",
+          });
+      });
+
+      getChallenge((data: unknown, peerId: string) => {
+        const d = data as ChallengePayload;
+        if (!d) return;
+        setPendingChallengeTransport("ble");
+        setPendingChallenge({
+          gameId: d.gameId,
+          challengerId: peerId,
+          challengerName: d.challengerName,
+          challengerElo: d.challengerElo,
+          color: d.color,
+        });
+      });
+
+      getChallengeResponse((data: unknown, peerId: string) => {
+        const d = data as ChallengeResponsePayload;
+        if (!d) return;
+        setChallengingId(null);
+        setWaitingForGameId(null);
+        if (d.type === "accept") {
+          const bleRoom = bleLobbyRoomRef.current;
+          if (!bleRoom) {
+            setBleError("Connection lost before game start.");
+            return;
+          }
+          storeBleGameRoom(bleRoom.room, d.gameId, bleRoom.selfPeerId);
+          bleLobbyRoomRef.current = null;
+          if (bleHeartbeatTimerRef.current) {
+            clearInterval(bleHeartbeatTimerRef.current);
+            bleHeartbeatTimerRef.current = null;
+          }
+          setBleConnected(false);
+          const peer = useLobbyStore.getState().peers.find((p) => p.id === peerId);
+          const params = new URLSearchParams({
+            room: d.gameId,
+            color: "w",
+            oppElo: String(peer?.elo ?? 1200),
+            oppName: peer?.name ?? "Opponent",
+            transport: "ble",
+          });
+          window.location.href = `/game?${params}`;
+        }
+      });
+
+      room.onPeerLeave((id) => {
+        if (bleHeartbeatTimerRef.current) {
+          clearInterval(bleHeartbeatTimerRef.current);
+          bleHeartbeatTimerRef.current = null;
+        }
+        bleLobbyRoomRef.current = null;
+        setBleConnected(false);
+        if (id) {
+          removePeer(id);
+          if (useLobbyStore.getState().pendingChallenge?.challengerId === id) {
+            clearPendingChallenge();
+            setPendingChallengeTransport(null);
+          }
+        }
+        setBleError("Disconnected from nearby device.");
+      });
+
+      const sendMyHeartbeat = () => {
+        sendHeartbeat({
+          id: selfPeerId,
+          elo,
+          name: name.trim() || "Player",
+          ready: true,
+          timestamp: Date.now(),
+        });
+      };
+      sendMyHeartbeat();
+      if (bleHeartbeatTimerRef.current) clearInterval(bleHeartbeatTimerRef.current);
+      bleHeartbeatTimerRef.current = setInterval(sendMyHeartbeat, HEARTBEAT_INTERVAL_MS);
+      setBleConnected(true);
+      setBleError(null);
+    } catch (err) {
+      setBleError(err instanceof Error ? err.message : "BLE connection failed");
+    } finally {
+      setBleConnecting(false);
+    }
+  }, [elo, name, addOrUpdatePeer, removePeer, setPendingChallenge, clearPendingChallenge, clearBleLobby]);
+
+  React.useEffect(() => {
+    return () => {
+      clearBleLobby();
+    };
+  }, [clearBleLobby]);
+
   const [showAllPeers, setShowAllPeers] = React.useState(false);
 
   const filteredPeers = React.useMemo(() => {
@@ -180,9 +319,14 @@ function LobbyContent() {
   );
 
   const handleChallenge = React.useCallback(
-    async (peerId: string, peerElo: number, peerName: string) => {
+    async (peerId: string, peerElo: number, peerName: string, transport?: "webrtc" | "ble") => {
+      const isBle = transport === "ble";
+      if (isBle && !bleLobbyRoomRef.current) {
+        setBleError("BLE disconnected. Reconnect to challenge nearby.");
+        return;
+      }
       const gameId = uuidv4();
-      const room = await getLobbyRoom();
+      const room = isBle && bleLobbyRoomRef.current ? bleLobbyRoomRef.current.room : await getLobbyRoom();
       const [sendChallenge] = room.makeAction("challenge");
       setChallengingId(peerId);
       setWaitingForGameId(gameId);
@@ -204,25 +348,49 @@ function LobbyContent() {
 
   const handleAcceptChallenge = React.useCallback(async () => {
     if (!pendingChallenge) return;
-    const room = await getLobbyRoom();
+    const isBle = pendingChallengeTransport === "ble";
+    if (isBle && !bleLobbyRoomRef.current) {
+      clearPendingChallenge();
+      setPendingChallengeTransport(null);
+      setBleError("BLE connection lost. Challenge expired.");
+      return;
+    }
+    const room = isBle && bleLobbyRoomRef.current ? bleLobbyRoomRef.current.room : await getLobbyRoom();
     const [sendResponse] = room.makeAction("challResp");
     sendResponse(
       { type: "accept", gameId: pendingChallenge.gameId, timestamp: Date.now() },
       pendingChallenge.challengerId
     );
     clearPendingChallenge();
+    setPendingChallengeTransport(null);
     const params = new URLSearchParams({
       room: pendingChallenge.gameId,
       color: "b",
       oppElo: String(pendingChallenge.challengerElo),
       oppName: pendingChallenge.challengerName,
     });
+    if (isBle && bleLobbyRoomRef.current) {
+      storeBleGameRoom(bleLobbyRoomRef.current.room, pendingChallenge.gameId, bleLobbyRoomRef.current.selfPeerId);
+      params.set("transport", "ble");
+      bleLobbyRoomRef.current = null;
+      if (bleHeartbeatTimerRef.current) {
+        clearInterval(bleHeartbeatTimerRef.current);
+        bleHeartbeatTimerRef.current = null;
+      }
+    }
     window.location.href = `/game?${params}`;
-  }, [pendingChallenge, clearPendingChallenge]);
+  }, [pendingChallenge, pendingChallengeTransport, clearPendingChallenge]);
 
   const handleDeclineChallenge = React.useCallback(async () => {
     if (!pendingChallenge) return;
-    const room = await getLobbyRoom();
+    const isBle = pendingChallengeTransport === "ble";
+    if (isBle && !bleLobbyRoomRef.current) {
+      clearPendingChallenge();
+      setPendingChallengeTransport(null);
+      setBleError("BLE connection lost. Challenge expired.");
+      return;
+    }
+    const room = isBle && bleLobbyRoomRef.current ? bleLobbyRoomRef.current.room : await getLobbyRoom();
     const [sendResponse] = room.makeAction("challResp");
     sendResponse(
       {
@@ -233,7 +401,8 @@ function LobbyContent() {
       pendingChallenge.challengerId
     );
     clearPendingChallenge();
-  }, [pendingChallenge, clearPendingChallenge]);
+    setPendingChallengeTransport(null);
+  }, [pendingChallenge, pendingChallengeTransport, clearPendingChallenge]);
 
   const handleCopyLink = React.useCallback(async () => {
     await copyToClipboard(link);
@@ -287,6 +456,43 @@ function LobbyContent() {
                   Copy
                 </Button>
               </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-medium">Nearby (no internet)</p>
+              {isBleSupported() ? (
+                <>
+                  {bleConnected ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Connected to nearby device</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearBleLobby}
+                        className="min-h-[44px] min-w-[44px]"
+                      >
+                        Disconnect
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={connectBle}
+                      disabled={bleConnecting}
+                      className="min-h-[44px] min-w-[44px]"
+                    >
+                      {bleConnecting ? "Connecting…" : "Connect via BLE"}
+                    </Button>
+                  )}
+                  {bleError && (
+                    <p className="mt-2 text-sm text-amber-200">{bleError}</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  BLE not supported in this browser. Use Chrome or Edge for nearby play.
+                </p>
+              )}
             </div>
 
             {waitingForGameId && (
@@ -347,12 +553,15 @@ function LobbyContent() {
                         <span className="ml-2 text-muted-foreground">
                           ELO {peer.elo}
                         </span>
+                        {peer.transport === "ble" && (
+                          <span className="ml-2 text-xs text-muted-foreground">Nearby</span>
+                        )}
                       </div>
                       <Button
                         size="sm"
                         disabled={challengingId === peer.id}
                         onClick={() =>
-                          handleChallenge(peer.id, peer.elo, peer.name)
+                          handleChallenge(peer.id, peer.elo, peer.name, peer.transport)
                         }
                         className="min-h-[44px] min-w-[44px]"
                       >

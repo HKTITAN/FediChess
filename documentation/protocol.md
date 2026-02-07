@@ -2,10 +2,26 @@
 
 This document defines the wire protocol used by FediChess clients. Any client (web, mobile, CLI, or other platform) that implements this protocol can discover peers, send and receive challenges, and play games interoperably.
 
-## Transport
+The same action names and JSON payloads apply to all transports; only the wire and discovery differ.
+
+## Transports
+
+FediChess supports two transports. Clients may use one or both; peers discovered over a given transport are used for that connection (e.g. BLE peer → game over BLE, WebRTC peer → game over WebRTC).
+
+### 1. WebRTC (Trystero)
 
 - **Discovery and signaling**: WebTorrent-compatible trackers (WSS). Clients join a "room" (see below) via Trystero (or a compatible WebRTC matchmaking layer) using the torrent strategy with the same `appId` and `relayUrls`.
 - **Data**: JSON payloads sent over Trystero actions (peer-to-peer after WebRTC connection). Action type strings must be **≤12 bytes** (Trystero constraint).
+- **Scope**: Internet; many peers per room; lobby and game rooms as in the Rooms table below.
+
+### 2. BLE (Web Bluetooth)
+
+- **Transport**: Bluetooth Low Energy GATT. One FediChess GATT service; one primary characteristic for bidirectional messages (read + notify + write).
+- **Service UUID**: `f47b5e2d-4a9e-4c5a-9b3f-8e1d2c3a4b5c` (FediChess BLE service).
+- **Characteristic UUID**: `a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d` (FediChess messages).
+- **Message format**: Each message is UTF-8: `actionName\n` followed by the JSON payload. Action names are the same as in the Action types table (≤12 bytes). Example: `heartbeat\n{"id":"...","elo":1200,"name":"Player","ready":true,"timestamp":123}`. If a message exceeds the MTU (e.g. 512 bytes), it may be sent in chunks; the receiver reassembles by buffering until a complete `actionName\n{...}` is available.
+- **Scope**: 1:1 connection per "room". Lobby over BLE = one connected device (one peer); game over BLE = the same connection. No multi-hop mesh in the browser (Web Bluetooth allows 1–2 concurrent GATT connections).
+- **Peer ID**: The remote peer is identified by a stable id (e.g. from an initial handshake, or device id, or a hash). Same payload shapes as WebRTC; `peerId` in payloads refers to this id.
 
 ## Rooms
 
@@ -182,3 +198,5 @@ One of:
 - App ID: `p2p-chess-v1`
 - Default lobby room: `p2p-chess-global`
 - Game room: `p2p-chess-{gameId}` where `gameId` is a UUID from the challenge.
+- BLE service UUID: `f47b5e2d-4a9e-4c5a-9b3f-8e1d2c3a4b5c`
+- BLE characteristic UUID: `a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d`

@@ -5,7 +5,9 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   getGameRoom,
+  getGameRoomBle,
   leaveRoom,
+  clearStoredBleGameRoom,
 } from "@/lib/p2p";
 import type {
   MovePayload,
@@ -17,6 +19,7 @@ import type {
   GameLogEvent,
   RolePayload,
 } from "@/lib/p2p";
+import type { Room } from "@/lib/transport-types";
 import { validateFen } from "@/lib/chess-engine";
 import { getGameStatus } from "@/lib/chess-engine";
 import { useUserStore, useGameStore, useUIStore } from "@/lib/store";
@@ -60,6 +63,8 @@ function GameContent() {
     isSpectator ? null : (colorParam === "w" || colorParam === "b" ? colorParam : "w");
   const oppEloParam = searchParams.get("oppElo");
   const oppNameParam = searchParams.get("oppName");
+  const transportParam = searchParams.get("transport");
+  const isBleGame = transportParam === "ble";
   const opponentEloFromUrl = oppEloParam ? parseInt(oppEloParam, 10) : null;
   const opponentNameFromUrl = oppNameParam ?? null;
 
@@ -96,6 +101,10 @@ function GameContent() {
   const [p2pError, setP2pError] = React.useState<string | null>(null);
   const [eloChange, setEloChange] = React.useState<number | null>(null);
   const eloUpdatedRef = React.useRef(false);
+  const gameRoomRef = React.useRef<{
+    room: Room;
+    selfId: string;
+  } | null>(null);
 
   const status = getGameStatus(fen);
   const isMyTurn = storedColor ? status.turn === storedColor : false;
@@ -121,15 +130,27 @@ function GameContent() {
     const gameRoomId = `p2p-chess-${roomId}`;
 
     const run = async () => {
-      let room: Awaited<ReturnType<typeof getGameRoom>>;
-      try {
-        room = await getGameRoom(roomId);
-      } catch (err) {
-        if (!mounted) return;
-        setP2pError(err instanceof Error ? err.message : "P2P unavailable. Use HTTPS or localhost.");
-        return;
+      let room: Room;
+      let selfId: string;
+      if (isBleGame) {
+        const ble = getGameRoomBle(roomId);
+        if (!ble) {
+          setP2pError("BLE game not found. Start a game from the lobby via Connect via BLE.");
+          return;
+        }
+        room = ble.room;
+        selfId = ble.selfPeerId;
+      } else {
+        try {
+          room = (await getGameRoom(roomId)) as unknown as Room;
+        } catch (err) {
+          if (!mounted) return;
+          setP2pError(err instanceof Error ? err.message : "P2P unavailable. Use HTTPS or localhost.");
+          return;
+        }
+        selfId = (await import("trystero/torrent")).selfId;
       }
-      const selfId = (await import("trystero/torrent")).selfId;
+      gameRoomRef.current = { room, selfId };
       const ourRole: RolePayload = isSpectator
         ? { role: "spectator", peerId: selfId }
         : { role: "player", color: myColor ?? "w", peerId: selfId };
@@ -252,6 +273,8 @@ function GameContent() {
 
       room.onPeerLeave(() => {
         if (!mounted) return;
+        gameRoomRef.current = null;
+        if (isBleGame) clearStoredBleGameRoom();
         if (!isGameOver) {
           setResult("win");
           setShowResultDialog(true);
@@ -260,7 +283,12 @@ function GameContent() {
 
       return () => {
         mounted = false;
-        leaveRoom(gameRoomId);
+        gameRoomRef.current = null;
+        if (isBleGame) {
+          clearStoredBleGameRoom();
+        } else {
+          leaveRoom(gameRoomId);
+        }
       };
     };
 
@@ -268,26 +296,35 @@ function GameContent() {
 
     return () => {
       mounted = false;
-      leaveRoom(gameRoomId);
+      gameRoomRef.current = null;
+      if (isBleGame) {
+        clearStoredBleGameRoom();
+      } else {
+        leaveRoom(gameRoomId);
+      }
     };
-  }, [roomId, myColor, isSpectator, setWhitePeerId, setBlackPeerId]);
+  }, [roomId, myColor, isSpectator, isBleGame, setWhitePeerId, setBlackPeerId]);
 
   const broadcastHistory = React.useCallback(
     async (event: GameLogEvent) => {
-      const room = await getGameRoom(roomId);
+      const current = gameRoomRef.current;
+      if (!current) return;
+      const { room } = current;
       const [sendHistory] = room.makeAction("history");
       const peers = room.getPeers();
       Object.keys(peers).forEach((pid) => {
         (sendHistory as (d: unknown, p: string) => void)(event, pid);
       });
     },
-    [roomId]
+    []
   );
 
   const sendMoveToOpponent = React.useCallback(
     async (newFen: string, san?: string) => {
       if (isSpectator) return;
-      const room = await getGameRoom(roomId);
+      const current = gameRoomRef.current;
+      if (!current) return;
+      const { room } = current;
       const [sendMove] = room.makeAction("move");
       const peers = room.getPeers();
       const peerIds = Object.keys(peers);
@@ -314,7 +351,7 @@ function GameContent() {
         });
       }
     },
-    [roomId, appendGameLogEvent, broadcastHistory, isSpectator]
+    [appendGameLogEvent, broadcastHistory, isSpectator]
   );
 
   const handleMove = React.useCallback(
@@ -339,7 +376,9 @@ function GameContent() {
 
   const handleResign = React.useCallback(async () => {
     if (isSpectator) return;
-    const room = await getGameRoom(roomId);
+    const current = gameRoomRef.current;
+    if (!current) return;
+    const { room } = current;
     const [sendGameEvent] = room.makeAction("gameEvent");
     const peers = room.getPeers();
     const ts = Date.now();
@@ -355,11 +394,13 @@ function GameContent() {
     });
     setResult("loss");
     setShowResultDialog(true);
-  }, [roomId, setResult, appendGameLogEvent, broadcastHistory, isSpectator]);
+  }, [setResult, appendGameLogEvent, broadcastHistory, isSpectator]);
 
   const handleDrawOffer = React.useCallback(async () => {
     if (isSpectator) return;
-    const room = await getGameRoom(roomId);
+    const current = gameRoomRef.current;
+    if (!current) return;
+    const { room } = current;
     const [sendGameEvent] = room.makeAction("gameEvent");
     const peers = room.getPeers();
     const ts = Date.now();
@@ -373,11 +414,13 @@ function GameContent() {
         pid
       );
     });
-  }, [roomId, appendGameLogEvent, broadcastHistory, isSpectator]);
+  }, [appendGameLogEvent, broadcastHistory, isSpectator]);
 
   const handleAcceptDraw = React.useCallback(async () => {
     if (isSpectator) return;
-    const room = await getGameRoom(roomId);
+    const current = gameRoomRef.current;
+    if (!current) return;
+    const { room } = current;
     const [sendGameEvent] = room.makeAction("gameEvent");
     const peers = room.getPeers();
     const ts = Date.now();
@@ -394,11 +437,13 @@ function GameContent() {
     setDrawOfferFrom(null);
     setResult("draw");
     setShowResultDialog(true);
-  }, [roomId, setResult, setDrawOfferFrom, appendGameLogEvent, broadcastHistory, isSpectator]);
+  }, [setResult, setDrawOfferFrom, appendGameLogEvent, broadcastHistory, isSpectator]);
 
   const handleDeclineDraw = React.useCallback(async () => {
     if (isSpectator) return;
-    const room = await getGameRoom(roomId);
+    const current = gameRoomRef.current;
+    if (!current) return;
+    const { room } = current;
     const [sendGameEvent] = room.makeAction("gameEvent");
     const ts = Date.now();
     const nextSeq = useGameStore.getState().gameEventLog.length + 1;
@@ -413,14 +458,15 @@ function GameContent() {
       );
     });
     setDrawOfferFrom(null);
-  }, [roomId, setDrawOfferFrom, appendGameLogEvent, broadcastHistory, isSpectator]);
+  }, [setDrawOfferFrom, appendGameLogEvent, broadcastHistory, isSpectator]);
 
   const handleChatSend = React.useCallback(
     async (text: string) => {
-      const room = await getGameRoom(roomId);
+      const current = gameRoomRef.current;
+      if (!current) return;
+      const { room, selfId } = current;
       const [sendChat] = room.makeAction("chat");
       const peers = room.getPeers();
-      const selfId = (await import("trystero/torrent")).selfId;
       Object.keys(peers).forEach((pid) => {
         (sendChat as (d: unknown, p: string) => void)(
           { type: "chat", text, peerId: selfId, timestamp: Date.now() },
@@ -429,7 +475,7 @@ function GameContent() {
       });
       addChatMessage(selfId, text);
     },
-    [roomId, addChatMessage]
+    [addChatMessage]
   );
 
   const handleTimeUp = React.useCallback(
@@ -510,6 +556,9 @@ function GameContent() {
             </Link>
             {isSpectator && (
               <span className="text-sm text-muted-foreground">Spectating</span>
+            )}
+            {isBleGame && (
+              <span className="text-sm text-muted-foreground">Nearby</span>
             )}
           </div>
           <GameTimer

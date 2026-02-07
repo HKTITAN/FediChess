@@ -22,6 +22,8 @@ interface UserState {
   hydrateFromStorage: () => Promise<void>;
 }
 
+export type TransportType = "webrtc" | "ble";
+
 interface LobbyState {
   peers: Array<{
     id: string;
@@ -29,6 +31,7 @@ interface LobbyState {
     name: string;
     ready: boolean;
     timestamp: number;
+    transport?: TransportType;
   }>;
   pendingChallenge: {
     gameId: string;

@@ -1,6 +1,7 @@
 /**
  * P2P layer: Trystero (torrent strategy), rooms, and action types/payloads for lobby and game.
  * Wire protocol is documented in documentation/protocol.md. Exports room helpers and payload types.
+ * Supports WebRTC (Trystero) and BLE transports; see lib/transport-types.ts for the Room interface.
  */
 import {
   P2P_APP_ID,
@@ -9,8 +10,16 @@ import {
   NAT_RETRY_COUNT,
   getIceServers,
 } from "./constants";
+import type { Room } from "./transport-types";
+import {
+  createBleRoom,
+  getStoredBleGameRoom,
+  setStoredBleGameRoom,
+  clearStoredBleGameRoom,
+} from "./ble-transport";
 
-export type { Room } from "trystero/torrent";
+export type { Room } from "./transport-types";
+export { isBleSupported, requestBleDevice, setStoredBleGameRoom, clearStoredBleGameRoom } from "./ble-transport";
 
 // Action payload types
 export interface HeartbeatPayload {
@@ -135,6 +144,27 @@ export async function getLobbyRoom(): Promise<import("trystero/torrent").Room> {
 
 export async function getGameRoom(gameId: string): Promise<import("trystero/torrent").Room> {
   return getRoom(`p2p-chess-${gameId}`);
+}
+
+/** BLE lobby: connect to device and get a Room (one peer). Caller must call requestBleDevice() first. */
+export async function getLobbyRoomBle(
+  device: BluetoothDevice,
+  selfPeerId?: string
+): Promise<{ room: Room; selfPeerId: string }> {
+  const result = await createBleRoom(device, selfPeerId);
+  return { room: result.room as Room, selfPeerId: result.selfPeerId };
+}
+
+/** BLE game: get the stored BLE room for this gameId (set when starting game from BLE lobby). */
+export function getGameRoomBle(gameId: string): { room: Room; selfPeerId: string } | null {
+  const stored = getStoredBleGameRoom(gameId);
+  if (!stored) return null;
+  return { room: stored.room as Room, selfPeerId: stored.selfPeerId };
+}
+
+/** Store BLE room when navigating from lobby to game so game page can reuse the connection. */
+export function storeBleGameRoom(room: Room, gameId: string, selfPeerId: string): void {
+  setStoredBleGameRoom(room as import("./ble-transport").BleRoom, gameId, selfPeerId);
 }
 
 export async function withNatRetry<T>(
