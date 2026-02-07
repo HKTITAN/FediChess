@@ -21,7 +21,7 @@ import {
 export type { Room } from "./transport-types";
 export { isBleSupported, requestBleDevice, setStoredBleGameRoom, clearStoredBleGameRoom } from "./ble-transport";
 
-// Action payload types
+/** Lobby: periodic presence (heartbeat action). */
 export interface HeartbeatPayload {
   id: string;
   elo: number;
@@ -30,6 +30,7 @@ export interface HeartbeatPayload {
   timestamp: number;
 }
 
+/** Lobby: challenge request (challenge action). */
 export interface ChallengePayload {
   type: "challenge";
   gameId: string;
@@ -40,12 +41,14 @@ export interface ChallengePayload {
   timestamp: number;
 }
 
+/** Lobby: accept or decline (challResp action). */
 export interface ChallengeResponsePayload {
   type: "accept" | "decline";
   gameId: string;
   timestamp: number;
 }
 
+/** Game: move (move action). FEN must be valid standard FEN. */
 export interface MovePayload {
   type: "move";
   fen: string;
@@ -53,6 +56,7 @@ export interface MovePayload {
   timestamp: number;
 }
 
+/** Game: chat message (chat action). */
 export interface ChatPayload {
   type: "chat";
   text: string;
@@ -60,11 +64,13 @@ export interface ChatPayload {
   timestamp: number;
 }
 
+/** Game: resign or draw offer/accept/decline (gameEvent action). */
 export interface GameEventPayload {
   type: "resign" | "drawOffer" | "drawAccept" | "drawDecline";
   timestamp: number;
 }
 
+/** Game: full FEN sync for new joiners (sync action). */
 export interface SyncPayload {
   type: "sync";
   fen: string;
@@ -98,13 +104,20 @@ const TRACKERS = P2P_TRACKERS as unknown as string[];
 
 let roomCache: Map<string, import("trystero/torrent").Room> = new Map();
 
-/** True when Web Crypto (crypto.subtle) is available — required by Trystero torrent strategy. */
+/**
+ * Whether P2P (WebRTC) is supported in this environment.
+ * Requires a secure context (HTTPS or localhost) with Web Crypto (crypto.subtle) for Trystero.
+ */
 export function isP2PSupported(): boolean {
   if (typeof window === "undefined") return false;
   const c = (window as Window & { crypto?: { subtle?: unknown } }).crypto;
   return Boolean(c?.subtle);
 }
 
+/**
+ * Get or create a Trystero (WebRTC) room by ID. Rooms are cached per roomId.
+ * Use getLobbyRoom() or getGameRoom(gameId) for standard room IDs.
+ */
 export async function getRoom(roomId: string): Promise<import("trystero/torrent").Room> {
   if (!isP2PSupported()) {
     throw new Error(
@@ -130,6 +143,7 @@ export async function getRoom(roomId: string): Promise<import("trystero/torrent"
   return room;
 }
 
+/** Leave a WebRTC room and remove it from the cache. */
 export function leaveRoom(roomId: string): void {
   const room = roomCache.get(roomId);
   if (room) {
@@ -138,15 +152,20 @@ export function leaveRoom(roomId: string): void {
   }
 }
 
+/** Get the default lobby room (p2p-chess-global). */
 export async function getLobbyRoom(): Promise<import("trystero/torrent").Room> {
   return getRoom(LOBBY_ROOM);
 }
 
+/** Get the game room for the given gameId (p2p-chess-{gameId}). */
 export async function getGameRoom(gameId: string): Promise<import("trystero/torrent").Room> {
   return getRoom(`p2p-chess-${gameId}`);
 }
 
-/** BLE lobby: connect to device and get a Room (one peer). Caller must call requestBleDevice() first. */
+/**
+ * BLE lobby: create a Room from a connected BLE device (one peer).
+ * Call requestBleDevice() first to get the device, then pass it here.
+ */
 export async function getLobbyRoomBle(
   device: BluetoothDevice,
   selfPeerId?: string
@@ -155,18 +174,25 @@ export async function getLobbyRoomBle(
   return { room: result.room as Room, selfPeerId: result.selfPeerId };
 }
 
-/** BLE game: get the stored BLE room for this gameId (set when starting game from BLE lobby). */
+/**
+ * BLE game: get the stored BLE room for this gameId.
+ * Returns non-null only when the game was started from BLE lobby (storeBleGameRoom was called on accept).
+ */
 export function getGameRoomBle(gameId: string): { room: Room; selfPeerId: string } | null {
   const stored = getStoredBleGameRoom(gameId);
   if (!stored) return null;
   return { room: stored.room as Room, selfPeerId: stored.selfPeerId };
 }
 
-/** Store BLE room when navigating from lobby to game so game page can reuse the connection. */
+/**
+ * Store the BLE room and selfPeerId for a game so the game page can reuse the connection.
+ * Call this when navigating from BLE lobby to game after the peer accepts the challenge.
+ */
 export function storeBleGameRoom(room: Room, gameId: string, selfPeerId: string): void {
   setStoredBleGameRoom(room as import("./ble-transport").BleRoom, gameId, selfPeerId);
 }
 
+/** Retry an async function with exponential backoff (e.g. for NAT traversal). */
 export async function withNatRetry<T>(
   fn: () => Promise<T>,
   onRetry?: (attempt: number) => void
@@ -188,6 +214,10 @@ export async function withNatRetry<T>(
   throw lastError;
 }
 
+/**
+ * Build a shareable lobby URL with room and ELO hash (for copy-link in lobby).
+ * Returns empty string when run outside the browser.
+ */
 export function getShareableLink(roomId: string, elo: number): string {
   if (typeof window === "undefined") return "";
   const base = window.location.origin + window.location.pathname;

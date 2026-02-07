@@ -17,3 +17,16 @@ yarn-error.log*
 # IDE
 .idea/
 .vscode/
+
+# Generated (e.g. by scripts/changelog-for-version.cjs during release)
+release_notes.md
+
+# SDKs
+sdks/bridge/node_modules/
+sdks/bridge/dist/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+sdks/rust/target/
+sdks/cpp/build/

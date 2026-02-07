@@ -31,6 +31,8 @@ flowchart LR
 - **WebRTC** (`lib/p2p.ts`): Trystero rooms; discovery via trackers; data over WebRTC data channels.
 - **BLE** (`lib/ble-transport.ts`): One GATT connection = one peer; length-prefixed messages; stored room when navigating lobby → game.
 
+To build other clients or an official SDK, see the [SDK guide](sdk-guide.md) and [protocol](protocol.md).
+
 ### WebRTC (online)
 
 ```mermaid

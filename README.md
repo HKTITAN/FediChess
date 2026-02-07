@@ -37,8 +37,13 @@
 - [Configuration](#configuration)
 - [Playing and testing](#playing-and-testing)
 - [Deployment](#deployment)
+- [Deployment checks (CI)](#deployment-checks-ci)
 - [Project structure](#project-structure)
 - [Documentation](#documentation)
+- [Architecture at a glance](#architecture-at-a-glance)
+- [Security and privacy](#security-and-privacy)
+- [FAQ](#faq)
+- [About this repository](#about-this-repository)
 - [Transports](#transports)
 - [Building other clients](#building-other-clients)
 - [Ranking and federation](#ranking-and-federation)
@@ -230,6 +235,13 @@ Other hosts: use build command `npm run build` (or `npm ci && npm run build`) an
 
 The manifest uses the favicon as a fallback. For a better "Add to home screen" experience, add `icon-192.png` and `icon-512.png` to `public/` and update the `icons` array in `public/manifest.webmanifest`.
 
+### Deployment checks (CI)
+
+The repo runs **GitHub Actions CI** (lint + build) on every push and pull request to the default branch. You can require this check to pass before Vercel promotes a deployment to Production, so only passing builds go live.
+
+- **Workflow:** [.github/workflows/ci.yml](.github/workflows/ci.yml) — installs dependencies, runs `npm run lint`, then `npm run build`.
+- **Enable in Vercel:** Project → **Settings** → **Git** → **Deployment Checks** → require the **CI** (or "Build and lint") check before deploying. See [documentation/deployment-checks.md](documentation/deployment-checks.md) for step-by-step instructions and troubleshooting.
+
 ---
 
 ## Project structure
@@ -257,6 +269,21 @@ Full “where to find what” map: [documentation/README.md](documentation/READM
 | [SDK guide](documentation/sdk-guide.md) | How to build FediChess clients in other languages (JS/TS, Python, Go, Rust) and interoperate with this app. |
 | [Ranking API](documentation/ranking-api.md) | Optional voluntary ranking service: submit results, leaderboard. User consent and configurable. |
 | [CHANGELOG](CHANGELOG.md) | Version history and release notes (current: 0.3.0). |
+| [Releases](documentation/releases.md) | How to cut a release; tag-triggered GitHub Releases with notes from CHANGELOG. |
+| [Deployment checks](documentation/deployment-checks.md) | Require CI to pass before production deploys (Vercel). |
+
+All of the above live in the [documentation/](documentation/) folder; [documentation/README.md](documentation/README.md) is the index.
+
+---
+
+## Architecture at a glance
+
+FediChess has **no central game server**. All gameplay (moves, chat, sync) happens directly between peers. The app uses two **transports** that share the same **wire protocol** (rooms, action names, JSON payloads):
+
+1. **WebRTC (online)** — Browsers connect to public WebTorrent-compatible WSS trackers to discover each other, then form peer-to-peer WebRTC data channels. The trackers are used only for discovery and signaling; once connected, game data flows only between the two players (and any spectators). Lobby room: `p2p-chess-global`; each game gets a room `p2p-chess-{gameId}`.
+2. **BLE (nearby)** — For local play without internet, the same protocol runs over Web Bluetooth (GATT). One device acts as a peripheral advertising the FediChess GATT service; the browser connects as central. Messages are length-prefixed `actionName` + JSON, same payloads as WebRTC.
+
+Lobby and game UI are **transport-agnostic**: they use a single **Room** interface (`makeAction`, `getPeers`, `onPeerJoin`, `onPeerLeave`, `leave`) implemented by both Trystero (WebRTC) and the BLE layer. State (user, lobby, game) lives in Zustand; persistence (ELO, game history) is IndexedDB and optional account backup (HMAC-signed export). For full diagrams, data flow, and edge cases (disconnect, refresh, NAT), see [Architecture](documentation/architecture.md).
 
 ---
 
@@ -271,14 +298,47 @@ Same [protocol](documentation/protocol.md): rooms, action names, JSON payloads. 
 
 ---
 
+## Security and privacy
+
+- **No server-side game logic.** Moves and chat are sent peer-to-peer. We do not log or store game content. ELO and game history are stored only in your browser (IndexedDB) and, if you use it, in your own backup file.
+- **Identity.** There is no account system. You choose a display name (e.g. a username); it is not verified. Anyone who can join the same lobby room can see that name and your ELO (from heartbeats). For strong authentication you would need a separate mechanism (e.g. signed credentials) not provided by this app.
+- **Trust.** Peers can send arbitrary JSON. The app validates FEN and game events and ignores invalid data. Only the two players designated via `role` messages may send moves and game events; spectators cannot.
+- **Trackers.** Default trackers are public WebTorrent WSS servers. They see room IDs and peer presence (for signaling); they do not see move or chat content. To reduce exposure you can run your own tracker and set `NEXT_PUBLIC_P2P_TRACKERS`.
+- **Account backup.** Exports are signed with HMAC (key derived from your password) so tampering is detectable. Backups are intended for personal restore; do not share backup files if they contain data you care about.
+
+---
+
 ## Building other clients
 
 The [wire protocol](documentation/protocol.md) is the source of truth. Any client that implements the same rooms, app ID, action names, and JSON payloads can discover peers, send challenges, and play games with this web app and other compatible clients.
 
 - **JavaScript/TypeScript:** This repo is the reference. **WebRTC:** Use Trystero (torrent strategy), same trackers and app ID. **BLE:** Implement the FediChess GATT service (see protocol doc for UUIDs and message format) or use `lib/ble-transport.ts` as reference. See [SDK guide](documentation/sdk-guide.md).
-- **Other languages:** Use a WebRTC + WebTorrent library for online play; for BLE, implement the same GATT service and message encoding. Protocol and payload shapes are in [protocol.md](documentation/protocol.md).
+- **Python, Rust, C++:** Official SDKs and examples live in [sdks/](sdks/); they use a shared Node bridge and the same protocol.
+- **Other languages:** Use the [bridge](sdks/bridge/README.md) from a client (see [sdks/](sdks/)) or a WebRTC + WebTorrent library; protocol and payload shapes are in [protocol.md](documentation/protocol.md).
 
 Community clients that implement the protocol can be listed in this README (open an issue or PR).
+
+---
+
+## FAQ
+
+**Do I need an account?**  
+No. You set a display name in the app; it is stored locally and sent in lobby heartbeats. There is no login or password for the game server (there is no game server). Account backup is optional and password-protected for your own restore.
+
+**Why can’t I see any peers in the lobby?**  
+You and others must be in the same lobby room (default: `p2p-chess-global`) and use the same app ID and trackers. If you changed `NEXT_PUBLIC_P2P_TRACKERS`, you’ll only see peers using the same trackers. Firewall or NAT can block WebRTC; try enabling STUN/TURN (see [Configuration](#configuration)).
+
+**Does BLE work between two browsers?**  
+No. The browser is always the **central** (client). The other side must be a **peripheral** advertising the FediChess GATT service (e.g. a native app or a BLE board). Two browser tabs cannot connect to each other via BLE.
+
+**Where is my ELO stored?**  
+Locally in your browser (IndexedDB). Optional “Backup account” exports it to a file; you can restore on another device. Optional ranking API can submit results to a third-party leaderboard with your consent.
+
+**Can I self-host?**  
+Yes. Build with `npm run build` and serve the `out/` directory. You can point the app at your own WebTorrent trackers via `NEXT_PUBLIC_P2P_TRACKERS`. There is no backend to host; it’s a static site.
+
+**How do I add a new SDK (e.g. Go)?**  
+Implement a client that spawns the [Node bridge](sdks/bridge/README.md) and speaks the same stdio JSON-lines protocol, or implement WebRTC + tracker discovery in your language. See [sdks/](sdks/) and [SDK guide](documentation/sdk-guide.md).
 
 ---
 
@@ -300,6 +360,17 @@ Contributions are welcome: bug reports, feature ideas, code, and documentation.
 - **Protocol:** The [protocol](documentation/protocol.md) is the source of truth. Client implementations in other languages that follow it can be proposed for listing as community SDKs.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for a short guide. By contributing, you agree that your contributions will be licensed under the MIT License.
+
+---
+
+## About this repository
+
+FediChess is **open source** (MIT). This repository contains the web app, wire protocol docs, and official SDKs (Python, Rust, C++) that use a shared Node bridge.
+
+**Suggested GitHub description** (repo About):  
+*The fediverse of chess — decentralized P2P chess in the browser. WebRTC and BLE, open protocol, no central server. Play online or nearby.*
+
+**Suggested topics:** `chess`, `p2p`, `webrtc`, `decentralized`, `multiplayer`, `nextjs`, `react`, `open-protocol`, `fediverse`, `typescript`, `ble`, `web-bluetooth`.
 
 ---
 

@@ -303,6 +303,8 @@ function GameContent() {
         leaveRoom(gameRoomId);
       }
     };
+    // Intentionally omit store setters/state: effect must run only when room/identity change; callbacks use getState() for fresh state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, myColor, isSpectator, isBleGame, setWhitePeerId, setBlackPeerId]);
 
   const broadcastHistory = React.useCallback(
