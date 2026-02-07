@@ -22,8 +22,9 @@ jobs:
           node-version: "20"
           cache: "npm"
 
+      # Use npm install for compatibility across npm versions; prefer npm ci locally for reproducibility.
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Lint
         run: npm run lint
