@@ -71,20 +71,39 @@ function DialogContent({
 }) {
   const { open, onOpenChange } = useDialog();
   const ref = React.useRef<HTMLDivElement>(null);
+  const previousActiveElement = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onOpenChange(false);
     };
     if (open) {
+      previousActiveElement.current = document.activeElement as HTMLElement | null;
       document.addEventListener("keydown", handler);
       document.body.style.overflow = "hidden";
     }
     return () => {
       document.removeEventListener("keydown", handler);
       document.body.style.overflow = "";
+      if (previousActiveElement.current && typeof previousActiveElement.current.focus === "function") {
+        previousActiveElement.current.focus();
+      }
     };
   }, [open, onOpenChange]);
+
+  React.useEffect(() => {
+    if (!open || !ref.current) return;
+    const el = ref.current;
+    const focusable = el.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable) {
+      focusable.focus();
+    } else {
+      el.setAttribute("tabindex", "-1");
+      el.focus();
+    }
+  }, [open]);
 
   if (!open) return null;
 
@@ -101,6 +120,7 @@ function DialogContent({
       <div
         ref={ref}
         role="dialog"
+        aria-modal="true"
         className={`relative z-50 max-h-[90vh] w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-lg ${className}`}
         onClick={(e) => e.stopPropagation()}
       >

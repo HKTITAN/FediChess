@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useUserStore } from "@/lib/store";
 import { useUIStore } from "@/lib/store";
 import { getShareableLink } from "@/lib/p2p";
+import { copyToClipboard } from "@/lib/clipboard";
 import { LOBBY_ROOM } from "@/lib/constants";
 import { useTheme } from "@/components/theme-provider";
 
@@ -20,9 +21,9 @@ export function Hero() {
     hydrateFromStorage();
   }, [hydrateFromStorage]);
 
-  const handleCopyLink = React.useCallback(() => {
+  const handleCopyLink = React.useCallback(async () => {
     const link = getShareableLink(LOBBY_ROOM, elo);
-    navigator.clipboard.writeText(link);
+    await copyToClipboard(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [elo]);
@@ -34,7 +35,7 @@ export function Hero() {
         <button
           type="button"
           onClick={() => setColorTheme(colorTheme === "dark" ? "light" : "dark")}
-          className="rounded px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
           aria-label="Toggle theme"
         >
           {colorTheme === "dark" ? "☀️" : "🌙"}
@@ -44,7 +45,7 @@ export function Hero() {
           onClick={() =>
             setChessTheme(chessTheme === "neon" ? "classic" : "neon")
           }
-          className="rounded px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
           aria-label="Toggle chess theme"
         >
           {chessTheme === "neon" ? "♟ Classic" : "✨ Neon"}
@@ -59,15 +60,15 @@ export function Hero() {
       </p>
 
       <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-        <Button size="lg" asChild className="transition-transform duration-200 hover:scale-[1.02]">
+        <Button size="lg" asChild className="min-h-[44px] min-w-[44px] transition-transform duration-200 hover:scale-[1.02]">
           <Link href={`/lobby?room=${encodeURIComponent(LOBBY_ROOM)}#elo=${elo}`}>
             Play Random
           </Link>
         </Button>
-        <Button variant="outline" size="lg" onClick={handleCopyLink}>
+        <Button variant="outline" size="lg" onClick={handleCopyLink} className="min-h-[44px] min-w-[44px]">
           {copied ? "Copied!" : "Copy Link"}
         </Button>
-        <Button variant="secondary" size="lg" asChild>
+        <Button variant="secondary" size="lg" asChild className="min-h-[44px] min-w-[44px]">
           <Link href="/local">Local AI</Link>
         </Button>
       </div>

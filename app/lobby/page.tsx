@@ -10,6 +10,7 @@ import {
   leaveRoom,
   getShareableLink,
 } from "@/lib/p2p";
+import { copyToClipboard } from "@/lib/clipboard";
 import type {
   HeartbeatPayload,
   ChallengePayload,
@@ -56,6 +57,7 @@ function LobbyContent() {
   } = useLobbyStore();
 
   const [loading, setLoading] = React.useState(true);
+  const [p2pError, setP2pError] = React.useState<string | null>(null);
   const [link, setLink] = React.useState("");
   const [challengingId, setChallengingId] = React.useState<string | null>(null);
 
@@ -73,7 +75,15 @@ function LobbyContent() {
     let mounted = true;
 
     const run = async () => {
-      const room = await getLobbyRoom();
+      let room: Awaited<ReturnType<typeof getLobbyRoom>>;
+      try {
+        room = await getLobbyRoom();
+      } catch (err) {
+        if (!mounted) return;
+        setP2pError(err instanceof Error ? err.message : "P2P unavailable. Use HTTPS or localhost.");
+        setLoading(false);
+        return;
+      }
       const [sendHeartbeat, getHeartbeat] = room.makeAction("heartbeat");
       const [sendChallenge, getChallenge] = room.makeAction("challenge");
       const [sendChallengeResponse, getChallengeResponse] =
@@ -225,8 +235,8 @@ function LobbyContent() {
     clearPendingChallenge();
   }, [pendingChallenge, clearPendingChallenge]);
 
-  const handleCopyLink = React.useCallback(() => {
-    navigator.clipboard.writeText(link);
+  const handleCopyLink = React.useCallback(async () => {
+    await copyToClipboard(link);
   }, [link]);
 
   return (
@@ -237,6 +247,12 @@ function LobbyContent() {
             ← Back
           </Link>
         </div>
+
+        {p2pError && (
+          <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            {p2pError}
+          </div>
+        )}
 
         <Card>
           <CardHeader>
@@ -267,7 +283,7 @@ function LobbyContent() {
                   value={link}
                   className="flex-1 font-mono text-sm"
                 />
-                <Button variant="outline" onClick={handleCopyLink}>
+                <Button variant="outline" onClick={handleCopyLink} className="min-h-[44px] min-w-[44px]">
                   Copy
                 </Button>
               </div>
@@ -290,8 +306,8 @@ function LobbyContent() {
                     {pendingChallenge.challengerName} (ELO {pendingChallenge.challengerElo}) challenges you!
                   </p>
                   <div className="mt-2 flex gap-2">
-                    <Button onClick={handleAcceptChallenge}>Accept</Button>
-                    <Button variant="outline" onClick={handleDeclineChallenge}>
+                    <Button onClick={handleAcceptChallenge} className="min-h-[44px] min-w-[44px]">Accept</Button>
+                    <Button variant="outline" onClick={handleDeclineChallenge} className="min-h-[44px] min-w-[44px]">
                       Decline
                     </Button>
                   </div>
@@ -308,6 +324,7 @@ function LobbyContent() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAllPeers((v) => !v)}
+                  className="min-h-[44px] min-w-[44px]"
                 >
                   {showAllPeers ? "Show ELO ±" + ELO_RANGE : "Show all peers"}
                 </Button>
@@ -337,6 +354,7 @@ function LobbyContent() {
                         onClick={() =>
                           handleChallenge(peer.id, peer.elo, peer.name)
                         }
+                        className="min-h-[44px] min-w-[44px]"
                       >
                         {challengingId === peer.id ? "Challenging…" : "Challenge"}
                       </Button>

@@ -2,6 +2,8 @@
 
 **Decentralized peer-to-peer chess in the browser — the fediverse of chess.** Play with anyone over the web without a central game server, or build your own client using the [open wire protocol](documentation/protocol.md). Matchmaking uses public WebTorrent trackers; moves and chat go directly between peers over WebRTC.
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/HKTITAN/fedichess)
+
 ---
 
 ## Table of contents
@@ -181,6 +183,10 @@ FediChess builds to a **static export** (`out/`). No Node server is required in 
 
 - Run `npm run build` and upload the contents of the `out/` directory to any static host (Netlify, Cloudflare Pages, GitHub Pages, etc.).
 - Ensure the host supports client-side routing (SPA fallback to `index.html` for `/lobby`, `/game`, etc.) if you use paths other than `/`.
+
+### PWA icons
+
+The manifest uses the favicon as a fallback. For a better "Add to home screen" experience, add `icon-192.png` and `icon-512.png` to `public/` and update the `icons` array in `public/manifest.webmanifest`.
 
 ---
 

@@ -22,6 +22,7 @@ import { getGameStatus } from "@/lib/chess-engine";
 import { useUserStore, useGameStore, useUIStore } from "@/lib/store";
 import { updateEloAfterGame } from "@/lib/elo";
 import { buildPgn, lichessAnalysisUrl } from "@/lib/pgn";
+import { copyToClipboard } from "@/lib/clipboard";
 import { GameChessBoard } from "@/components/game/ChessBoard";
 import { MoveHistory } from "@/components/game/MoveHistory";
 import { GameChat } from "@/components/game/Chat";
@@ -92,6 +93,7 @@ function GameContent() {
   const { theme: chessTheme } = useUIStore();
 
   const [showResultDialog, setShowResultDialog] = React.useState(false);
+  const [p2pError, setP2pError] = React.useState<string | null>(null);
   const [eloChange, setEloChange] = React.useState<number | null>(null);
   const eloUpdatedRef = React.useRef(false);
 
@@ -119,7 +121,14 @@ function GameContent() {
     const gameRoomId = `p2p-chess-${roomId}`;
 
     const run = async () => {
-      const room = await getGameRoom(roomId);
+      let room: Awaited<ReturnType<typeof getGameRoom>>;
+      try {
+        room = await getGameRoom(roomId);
+      } catch (err) {
+        if (!mounted) return;
+        setP2pError(err instanceof Error ? err.message : "P2P unavailable. Use HTTPS or localhost.");
+        return;
+      }
       const selfId = (await import("trystero/torrent")).selfId;
       const ourRole: RolePayload = isSpectator
         ? { role: "spectator", peerId: selfId }
@@ -442,8 +451,8 @@ function GameContent() {
     });
   }, [result, opponentElo, opponentEloFromUrl, elo, roomId, fen, isSpectator]);
 
-  const handleCopyFen = React.useCallback(() => {
-    navigator.clipboard.writeText(fen);
+  const handleCopyFen = React.useCallback(async () => {
+    await copyToClipboard(fen);
   }, [fen]);
 
   const pgn = React.useMemo(
@@ -467,8 +476,8 @@ function GameContent() {
     [moveHistory, result, storedColor, myName, opponentName]
   );
 
-  const handleCopyPgn = React.useCallback(() => {
-    navigator.clipboard.writeText(pgn);
+  const handleCopyPgn = React.useCallback(async () => {
+    await copyToClipboard(pgn);
   }, [pgn]);
 
   const lichessUrl = React.useMemo(() => lichessAnalysisUrl(pgn), [pgn]);
@@ -478,6 +487,15 @@ function GameContent() {
       <main className="min-h-screen p-4">
         <p>Invalid game. Missing room ID.</p>
         <Link href="/">Go home</Link>
+      </main>
+    );
+  }
+
+  if (p2pError) {
+    return (
+      <main className="min-h-screen p-4 flex flex-col items-center justify-center gap-4">
+        <p className="text-center text-muted-foreground">{p2pError}</p>
+        <Link href="/" className="text-primary underline">Go home</Link>
       </main>
     );
   }
@@ -513,19 +531,19 @@ function GameContent() {
               theme={chessTheme}
             />
             {!isSpectator && (
-              <div className="mt-4 flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleResign}>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={handleResign} className="min-h-[44px] min-w-[44px]">
                   Resign
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleDrawOffer}>
+                <Button variant="outline" size="sm" onClick={handleDrawOffer} className="min-h-[44px] min-w-[44px]">
                   Offer Draw
                 </Button>
                 {drawOfferFrom && (
                   <>
-                    <Button size="sm" onClick={handleAcceptDraw}>
+                    <Button size="sm" onClick={handleAcceptDraw} className="min-h-[44px] min-w-[44px]">
                       Accept Draw
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleDeclineDraw}>
+                    <Button variant="outline" size="sm" onClick={handleDeclineDraw} className="min-h-[44px] min-w-[44px]">
                       Decline
                     </Button>
                   </>
@@ -574,18 +592,18 @@ function GameContent() {
             </p>
           )}
           <DialogFooter className="flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopyFen}>
+            <Button variant="outline" size="sm" onClick={handleCopyFen} className="min-h-[44px] min-w-[44px]">
               Copy FEN
             </Button>
-            <Button variant="outline" size="sm" onClick={handleCopyPgn}>
+            <Button variant="outline" size="sm" onClick={handleCopyPgn} className="min-h-[44px] min-w-[44px]">
               Copy PGN
             </Button>
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild className="min-h-[44px] min-w-[44px]">
               <a href={lichessUrl} target="_blank" rel="noopener noreferrer">
                 Analyze on Lichess
               </a>
             </Button>
-            <Button asChild>
+            <Button asChild className="min-h-[44px] min-w-[44px]">
               <Link href="/" onClick={() => { resetGame(); setShowResultDialog(false); }}>
                 Back to Home
               </Link>

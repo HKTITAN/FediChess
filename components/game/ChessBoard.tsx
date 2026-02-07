@@ -16,6 +16,9 @@ interface ChessBoardProps {
 const lightSquareStyle = { backgroundColor: "#f0d9b5" };
 const darkSquareStyle = { backgroundColor: "#b58863" };
 
+const BOARD_MIN = 280;
+const BOARD_MAX = 400;
+
 export function GameChessBoard({
   fen,
   orientation = "white",
@@ -23,7 +26,25 @@ export function GameChessBoard({
   disabled = false,
   theme = "classic",
 }: ChessBoardProps) {
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const [boardWidth, setBoardWidth] = React.useState(BOARD_MAX);
   const [lastMove, setLastMove] = React.useState<{ from: string; to: string } | null>(null);
+
+  React.useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.clientWidth;
+      setBoardWidth((prev) => {
+        const next = Math.min(BOARD_MAX, Math.max(BOARD_MIN, w));
+        return next === prev ? prev : next;
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const onDrop = React.useCallback(
     (sourceSquare: string, targetSquare: string) => {
@@ -67,8 +88,9 @@ export function GameChessBoard({
 
   return (
     <div
+      ref={wrapperRef}
       className={
-        theme === "neon" ? "theme-neon rounded-lg overflow-hidden" : ""
+        theme === "neon" ? "theme-neon rounded-lg overflow-hidden w-full max-w-[400px]" : "w-full max-w-[400px]"
       }
     >
       <Chessboard
@@ -79,7 +101,7 @@ export function GameChessBoard({
         customSquareStyles={customSquareStyles}
         customDarkSquareStyle={customDarkSquareStyle}
         customLightSquareStyle={customLightSquareStyle}
-        boardWidth={400}
+        boardWidth={boardWidth}
         animationDuration={200}
       />
     </div>

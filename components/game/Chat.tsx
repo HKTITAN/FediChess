@@ -36,7 +36,7 @@ export function GameChat({ messages, onSend, opponentName }: ChatProps) {
         className="flex-1 overflow-y-auto p-2 space-y-2 text-sm"
       >
         {messages.map((m, i) => (
-          <div key={i} className="break-words">
+          <div key={`${m.timestamp}-${m.peerId}-${i}`} className="break-words">
             <span className="text-muted-foreground font-medium">
               {m.peerId.slice(0, 6)}:
             </span>{" "}

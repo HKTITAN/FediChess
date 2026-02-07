@@ -35,10 +35,15 @@ async function getRandomMove(fen: string): Promise<string | null> {
 }
 
 export default function LocalAIPage() {
+  const [mounted, setMounted] = React.useState(false);
   const [fen, setFen] = React.useState(INITIAL_FEN);
   const [thinking, setThinking] = React.useState(false);
   const [result, setResult] = React.useState<string | null>(null);
   const { theme: chessTheme } = useUIStore();
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const status = getGameStatus(fen);
   const isPlayerTurn = status.turn === "w";
@@ -75,8 +80,6 @@ export default function LocalAIPage() {
     [fen, makeAIMove]
   );
 
-  if (typeof window === "undefined" || !Chessboard) return null;
-
   return (
     <main className="min-h-screen p-4">
       <div className="mx-auto max-w-lg">
@@ -85,43 +88,52 @@ export default function LocalAIPage() {
             ← Back
           </Link>
           <span className="text-sm text-muted-foreground">
-            Play vs Stockfish (Local)
+            Play vs simple AI (random moves)
           </span>
         </div>
 
-        {result && (
-          <div className="mb-4 rounded-lg bg-primary/20 p-4 text-center font-medium">
-            {result}
+        {!mounted ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            Loading…
           </div>
+        ) : (
+          <>
+            {result && (
+              <div className="mb-4 rounded-lg bg-primary/20 p-4 text-center font-medium">
+                {result}
+              </div>
+            )}
+
+            <div className={chessTheme === "neon" ? "theme-neon" : ""}>
+              <Chessboard
+                position={fen}
+                onPieceDrop={onDrop}
+                boardOrientation="white"
+                arePiecesDraggable={isPlayerTurn && !result && !thinking}
+                boardWidth={400}
+              />
+            </div>
+
+            {thinking && (
+              <p className="mt-4 text-center text-muted-foreground">
+                AI thinking…
+              </p>
+            )}
+
+            <div className="mt-4 flex justify-center gap-2">
+              <Button
+                variant="outline"
+                className="min-h-[44px] min-w-[44px]"
+                onClick={() => {
+                  setFen(INITIAL_FEN);
+                  setResult(null);
+                }}
+              >
+                New Game
+              </Button>
+            </div>
+          </>
         )}
-
-        <div className={chessTheme === "neon" ? "theme-neon" : ""}>
-          <Chessboard
-            position={fen}
-            onPieceDrop={onDrop}
-            boardOrientation="white"
-            arePiecesDraggable={isPlayerTurn && !result && !thinking}
-            boardWidth={400}
-          />
-        </div>
-
-        {thinking && (
-          <p className="mt-4 text-center text-muted-foreground">
-            AI thinking…
-          </p>
-        )}
-
-        <div className="mt-4 flex justify-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setFen(INITIAL_FEN);
-              setResult(null);
-            }}
-          >
-            New Game
-          </Button>
-        </div>
       </div>
     </main>
   );
