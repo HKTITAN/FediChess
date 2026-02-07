@@ -363,16 +363,6 @@ Contributions are welcome: bug reports, feature ideas, code, and documentation.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for a short guide. By contributing, you agree that your contributions will be licensed under the MIT License.
 
----
-
-## About this repository
-
-FediChess is **open source** (MIT). This repository contains the web app, wire protocol docs, and official SDKs (Python, Rust, C++) that use a shared Node bridge.
-
-**Suggested GitHub description** (repo About):  
-*The fediverse of chess — decentralized P2P chess in the browser. WebRTC and BLE, open protocol, no central server. Play online or nearby.*
-
-**Suggested topics:** `chess`, `p2p`, `webrtc`, `decentralized`, `multiplayer`, `nextjs`, `react`, `open-protocol`, `fediverse`, `typescript`, `ble`, `web-bluetooth`.
 
 ---
 
