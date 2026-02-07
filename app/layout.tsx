@@ -13,10 +13,28 @@ const instrumentSerif = Instrument_Serif({
   display: "swap",
 });
 
+const baseUrl =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_APP_URL
+    ? process.env.NEXT_PUBLIC_APP_URL
+    : typeof process !== "undefined" && process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(baseUrl),
   title: "FediChess - Play Free Online",
   description: "Play chess peer-to-peer, no servers. Free multiplayer over WebRTC.",
   manifest: "/manifest.webmanifest",
+  openGraph: {
+    title: "FediChess - Play Free Online",
+    description: "Play chess peer-to-peer, no servers. Free multiplayer over WebRTC.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FediChess - Play Free Online",
+    description: "Play chess peer-to-peer, no servers. Free multiplayer over WebRTC.",
+  },
 };
 
 export const viewport: Viewport = {
@@ -36,7 +54,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={instrumentSerif.variable}>
       <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/icon.png" type="image/png" sizes="48x48" />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){var s=typeof document!=='undefined'&&document.documentElement;if(!s)return;var p=typeof localStorage!=='undefined'?localStorage.getItem('p2p-chess-theme-pref'):null;var d=typeof matchMedia!=='undefined'&&matchMedia('(prefers-color-scheme: dark)').matches;var t=p==='light'||p==='dark'?p:(d?'dark':'light');s.classList.add(t);})();`,
