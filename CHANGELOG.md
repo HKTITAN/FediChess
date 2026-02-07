@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-- (No changes yet.)
+### Added
+
+- **Secure account export/import:** Export ELO record, game history, and display name to a JSON file; restore on this or another device. Backup is signed with HMAC-SHA-256 (key derived from user password via PBKDF2) so data cannot be modified for fair play. Settings page at `/settings`; entry points from lobby ("Backup account") and home ("Backup").
 
 ---
 

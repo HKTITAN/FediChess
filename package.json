@@ -2,6 +2,9 @@
   "name": "fedichess",
   "version": "0.3.0",
   "private": true,
+  "engines": {
+    "node": ">=18.17.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,12 +12,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@vercel/analytics": "^1.6.1",
     "chess.js": "^1.0.0-beta.8",
     "idb-keyval": "^6.2.1",
     "next": "15.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
     "react-chessboard": "^4.6.2",
+    "react-dom": "^19.0.0",
     "trystero": "^0.21.3",
     "uuid": "^11.0.3",
     "zustand": "^5.0.2"

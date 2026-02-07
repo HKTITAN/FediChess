@@ -415,6 +415,9 @@ function LobbyContent() {
           <Link href="/" className="text-muted-foreground hover:text-foreground">
             ← Back
           </Link>
+          <Link href="/settings" className="text-muted-foreground hover:text-foreground">
+            Backup account
+          </Link>
         </div>
 
         {p2pError && (

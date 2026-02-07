@@ -1,0 +1,9 @@
+# FediChess — Netlify build config (Next.js static export)
+# https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  command = "npm run build"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "20"

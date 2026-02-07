@@ -4,7 +4,25 @@
 
 **Version:** 0.3.0 — see [CHANGELOG](CHANGELOG.md) for release history.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/HKTITAN/fedichess)
+### Deploy
+
+| | | |
+|:---:|:---:|:---:|
+| [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/HKTITAN/fedichess) | [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/HKTITAN/fedichess) | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/HKTITAN/fedichess) |
+| [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?repository=https://github.com/HKTITAN/fedichess) | [![Deploy to Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?type=git&builder=buildpack&repository=github.com/HKTITAN/fedichess&branch=main&name=fedichess) | [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/HKTITAN/fedichess) |
+| [![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/HKTITAN/fedichess/tree/main) | [![Cloudflare Pages](https://img.shields.io/badge/Deploy_to-Cloudflare_Pages-f38020?style=for-the-badge&logo=cloudflare)](https://dash.cloudflare.com/?to=/:account/pages/new/connect-repo?repo=https://github.com/HKTITAN/fedichess) | [![Azure Static Web Apps](https://img.shields.io/badge/Deploy_to-Azure_Static_Web_Apps-0078d4?style=for-the-badge&logo=microsoftazure)](https://portal.azure.com/#create/Microsoft.StaticApp) |
+| [![Firebase Hosting](https://img.shields.io/badge/Deploy_to-Firebase_Hosting-ffca28?style=for-the-badge&logo=firebase)](https://console.firebase.google.com/project/_/hosting) | [![AWS Amplify](https://img.shields.io/badge/Deploy_to-AWS_Amplify-ff9900?style=for-the-badge&logo=awsamplify)](https://console.aws.amazon.com/amplify/home#/create&repo=https://github.com/HKTITAN/fedichess) | [![Fly.io](https://img.shields.io/badge/Deploy_to-Fly.io-4051b5?style=for-the-badge&logo=fly.io)](https://fly.io/docs/hands-on/install-flyctl/) |
+| [![Google Cloud Run](https://img.shields.io/badge/Deploy_to-Google_Cloud_Run-4285f4?style=for-the-badge&logo=googlecloud)](https://console.cloud.google.com/run) | [![Deno Deploy](https://img.shields.io/badge/Deploy_to-Deno_Deploy-000?style=for-the-badge&logo=deno)](https://deno.com/deploy) | [![Platform.sh](https://img.shields.io/badge/Deploy_to-Platform.sh-1a1a2e?style=for-the-badge)](https://console.platform.sh/) |
+
+### Open in / Build with
+
+| | | |
+|:---:|:---:|:---:|
+| [![Open in Cursor](https://img.shields.io/badge/Open_in-Cursor-000?style=for-the-badge&logo=cursor)](https://cursor.com/open?repo=https://github.com/HKTITAN/fedichess) | [![GitHub Codespaces](https://img.shields.io/badge/Open_in-GitHub_Codespaces-24292f?style=for-the-badge&logo=github)](https://codespaces.new/HKTITAN/fedichess) | [![Open in GitPod](https://img.shields.io/badge/Open_in-GitPod-ffae33?style=for-the-badge&logo=gitpod)](https://gitpod.io/#https://github.com/HKTITAN/fedichess) |
+| [![Open in CodeSandbox](https://img.shields.io/badge/Open_in-CodeSandbox-151515?style=for-the-badge&logo=codesandbox)](https://githubbox.com/HKTITAN/fedichess) | [![Open in StackBlitz](https://img.shields.io/badge/Open_in-StackBlitz-1389fd?style=for-the-badge&logo=stackblitz)](https://stackblitz.com/github/HKTITAN/fedichess) | [![Open in Replit](https://img.shields.io/badge/Open_in-Replit-667881?style=for-the-badge&logo=replit)](https://replit.com/github/HKTITAN/fedichess) |
+| [![Open in Glitch](https://img.shields.io/badge/Open_in-Glitch-3333ff?style=for-the-badge&logo=glitch)](https://glitch.com/import/github/HKTITAN/fedichess) | [![GitHub Copilot](https://img.shields.io/badge/Build_with-GitHub_Copilot-24292f?style=for-the-badge&logo=github)](https://github.com/HKTITAN/fedichess) | [![v0](https://img.shields.io/badge/Build_with-v0-000?style=for-the-badge&logo=vercel)](https://v0.dev) |
+| [![Codeium](https://img.shields.io/badge/Build_with-Codeium-000?style=for-the-badge&logo=codeium)](https://codeium.com) | [![Windsurf](https://img.shields.io/badge/Build_with-Windsurf-000?style=for-the-badge)](https://codeium.com/windsurf) | [![Bolt.new](https://img.shields.io/badge/Build_with-Bolt.new-000?style=for-the-badge)](https://bolt.new) |
+| [![VS Code](https://img.shields.io/badge/Open_in-VS_Code-007acc?style=for-the-badge&logo=visualstudiocode)](https://github.dev/HKTITAN/fedichess) | [![Codeium IDE](https://img.shields.io/badge/Codeium_IDE-000?style=for-the-badge&logo=codeium)](https://codeium.com/ide) | [![Cursor Rules](https://img.shields.io/badge/Cursor_Rules-000?style=for-the-badge&logo=cursor)](https://cursor.com) |
 
 ---
 
@@ -46,6 +64,7 @@
 - **Lobby + ELO matchmaking** — Default ELO range ±200; optional “Show all peers” to challenge anyone in the lobby. Set a username (e.g. `HKTITAN`) visible to others.
 - **Full game flow** — 5 min + 30s increment clocks, in-game chat, resign, draw offer/accept. Spectators can join and watch; only the two players send moves.
 - **PGN export & analysis** — Copy FEN/PGN from the result dialog. One-click link to analyze on Lichess (or paste into Chess.com).
+- **Account backup** — Export progress (ELO, game history, name) to a file and restore on another device. Backups are signed (password-protected HMAC) so they cannot be edited for fair play. Use **Backup account** from the lobby or home.
 
 ### Technical
 
@@ -180,6 +199,20 @@ Click **Local AI** on the home page to play vs a simple engine (random legal mov
 ## Deployment
 
 FediChess builds to a **static export** (`out/`). No Node server is required in production.
+
+### Build configuration (Vercel, Netlify, Render, etc.)
+
+The repo is set up for one-click and Git-based deploys:
+
+| File | Purpose |
+|------|---------|
+| `package.json` | `engines.node`: `>=18.17.0`; scripts: `build` = `next build`, `dev` = `next dev`. |
+| `.nvmrc` | Node 20 (used by many platforms and locally with `nvm use`). |
+| `vercel.json` | Framework: `nextjs` (Vercel runs `next build` and serves the static export). |
+| `netlify.toml` | Build: `npm run build`, publish: `out`, `NODE_VERSION`: 20. |
+| `render.yaml` | Blueprint: static site, `buildCommand`: `npm ci && npm run build`, `staticPublishPath`: `out`. |
+
+Other hosts: use build command `npm run build` (or `npm ci && npm run build`) and publish directory `out`. Optional env: `NEXT_PUBLIC_P2P_TRACKERS`, `NEXT_PUBLIC_STUN_URL`, etc. (see [Configuration](#configuration)).
 
 ### Vercel (recommended)
 

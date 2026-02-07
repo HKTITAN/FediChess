@@ -1,0 +1,10 @@
+# FediChess — Render static site config (Next.js static export)
+# Used when deploying via the "Deploy to Render" button.
+# https://render.com/docs/static-sites
+
+services:
+  - type: web
+    name: fedichess
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: out

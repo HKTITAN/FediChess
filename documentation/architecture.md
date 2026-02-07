@@ -78,7 +78,7 @@ flowchart LR
 | P2P       | Trystero (torrent), WebTorrent trackers, WebRTC; BLE via Web Bluetooth (`lib/ble-transport.ts`). Shared Room interface (`lib/transport-types.ts`). |
 | Game      | chess.js (rules), react-chessboard (board UI) |
 | State     | Zustand (user, lobby, game, UI); peers tagged by `transport: 'webrtc' \| 'ble'` |
-| Persistence | IndexedDB via idb-keyval (ELO, name, game history) |
+| Persistence | IndexedDB via idb-keyval (ELO, name, game history). Account backup (export/import) is HMAC-signed with user password for integrity so backups cannot be edited for fair play. |
 
 ## Data flow
 

@@ -31,7 +31,13 @@ export function Hero() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
       {/* Secondary actions in a compact tray: one primary focus (Play) below */}
-      <div className="absolute top-4 right-4 flex gap-2 rounded-lg border border-border/50 bg-background/80 px-2 py-1.5 backdrop-blur-sm">
+      <div className="absolute top-4 right-4 flex flex-wrap items-center gap-2 rounded-lg border border-border/50 bg-background/80 px-2 py-1.5 backdrop-blur-sm">
+        <Link
+          href="/settings"
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Backup
+        </Link>
         <button
           type="button"
           onClick={() => setColorTheme(colorTheme === "dark" ? "light" : "dark")}
