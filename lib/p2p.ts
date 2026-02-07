@@ -89,7 +89,20 @@ const TRACKERS = P2P_TRACKERS as unknown as string[];
 
 let roomCache: Map<string, import("trystero/torrent").Room> = new Map();
 
+/** True when Web Crypto (crypto.subtle) is available — required by Trystero torrent strategy. */
+export function isP2PSupported(): boolean {
+  if (typeof window === "undefined") return false;
+  const c = (window as Window & { crypto?: { subtle?: unknown } }).crypto;
+  return Boolean(c?.subtle);
+}
+
 export async function getRoom(roomId: string): Promise<import("trystero/torrent").Room> {
+  if (!isP2PSupported()) {
+    throw new Error(
+      "P2P requires a secure context (HTTPS or localhost) with Web Crypto. Please use HTTPS or open from localhost."
+    );
+  }
+
   const cached = roomCache.get(roomId);
   if (cached) return cached;
 
