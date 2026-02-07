@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { DEFAULT_ELO } from "./constants";
+import { getGameStatus } from "./chess-engine";
+import type { GameLogEvent } from "./p2p";
 
 export type ChessTheme = "classic" | "neon";
 export type GameResult = "win" | "loss" | "draw" | null;
@@ -46,8 +48,11 @@ interface GameState {
   opponentId: string | null;
   opponentName: string | null;
   opponentElo: number | null;
+  whitePeerId: string | null;
+  blackPeerId: string | null;
   result: GameResult;
   moveHistory: string[];
+  gameEventLog: GameLogEvent[];
   chatMessages: Array<{ peerId: string; text: string; timestamp: number }>;
   whiteTimeMs: number;
   blackTimeMs: number;
@@ -56,7 +61,7 @@ interface GameState {
     gameId: string;
     roomId: string;
     fen: string;
-    myColor: "w" | "b";
+    myColor: "w" | "b" | null;
     opponentId: string | null;
     opponentName: string | null;
     opponentElo: number | null;
@@ -64,6 +69,10 @@ interface GameState {
   setFen: (fen: string) => void;
   addMove: (san: string) => void;
   setResult: (r: GameResult) => void;
+  setGameEventLog: (events: GameLogEvent[]) => void;
+  appendGameLogEvent: (event: GameLogEvent) => void;
+  setWhitePeerId: (id: string | null) => void;
+  setBlackPeerId: (id: string | null) => void;
   addChatMessage: (peerId: string, text: string) => void;
   setWhiteTime: (ms: number) => void;
   setBlackTime: (ms: number) => void;
@@ -80,6 +89,39 @@ interface UIState {
 
 const defaultFen =
   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+function replayGameLog(
+  events: GameLogEvent[],
+  myColor: "w" | "b" | null
+): {
+  fen: string;
+  moveHistory: string[];
+  result: GameResult;
+  drawOfferFrom: string | null;
+} {
+  let fen = defaultFen;
+  const moveHistory: string[] = [];
+  let result: GameResult = null;
+  let drawOfferFrom: string | null = null;
+  for (const e of events) {
+    if (e.kind === "move") {
+      fen = e.fen;
+      if (e.san) moveHistory.push(e.san);
+    } else if (e.kind === "resign") {
+      const st = getGameStatus(fen);
+      const resignerTurn = st.turn;
+      if (myColor) result = resignerTurn === myColor ? "loss" : "win";
+      break;
+    } else if (e.kind === "drawAccept") {
+      result = "draw";
+      drawOfferFrom = null;
+      break;
+    } else if (e.kind === "drawDecline") {
+      drawOfferFrom = null;
+    }
+  }
+  return { fen, moveHistory, result, drawOfferFrom };
+}
 
 export const useUserStore = create<UserState>((set) => ({
   elo: DEFAULT_ELO,
@@ -144,8 +186,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   opponentId: null,
   opponentName: null,
   opponentElo: null,
+  whitePeerId: null,
+  blackPeerId: null,
   result: null,
   moveHistory: [],
+  gameEventLog: [],
   chatMessages: [],
   whiteTimeMs: 5 * 60 * 1000,
   blackTimeMs: 5 * 60 * 1000,
@@ -153,7 +198,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   setGame: (params) =>
     set({
       ...params,
+      whitePeerId: null,
+      blackPeerId: null,
       moveHistory: [],
+      gameEventLog: [],
       chatMessages: [],
       result: null,
       whiteTimeMs: 5 * 60 * 1000,
@@ -164,6 +212,21 @@ export const useGameStore = create<GameState>((set, get) => ({
   addMove: (san) =>
     set((s) => ({ moveHistory: [...s.moveHistory, san] })),
   setResult: (result) => set({ result }),
+  setGameEventLog: (events) =>
+    set((s) => {
+      const { fen, moveHistory, result, drawOfferFrom } = replayGameLog(events, s.myColor);
+      return { gameEventLog: events, fen, moveHistory, result, drawOfferFrom };
+    }),
+  appendGameLogEvent: (event) =>
+    set((s) => {
+      const nextSeq = s.gameEventLog.length + 1;
+      if (event.seq !== nextSeq) return {};
+      const nextLog = [...s.gameEventLog, event];
+      const { fen, moveHistory, result, drawOfferFrom } = replayGameLog(nextLog, s.myColor);
+      return { gameEventLog: nextLog, fen, moveHistory, result, drawOfferFrom };
+    }),
+  setWhitePeerId: (whitePeerId) => set({ whitePeerId }),
+  setBlackPeerId: (blackPeerId) => set({ blackPeerId }),
   addChatMessage: (peerId, text) =>
     set((s) => ({
       chatMessages: [
@@ -183,8 +246,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       opponentId: null,
       opponentName: null,
       opponentElo: null,
+      whitePeerId: null,
+      blackPeerId: null,
       result: null,
       moveHistory: [],
+      gameEventLog: [],
       chatMessages: [],
       whiteTimeMs: 5 * 60 * 1000,
       blackTimeMs: 5 * 60 * 1000,

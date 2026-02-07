@@ -7,11 +7,21 @@ import {
   getGameRoom,
   leaveRoom,
 } from "@/lib/p2p";
-import type { MovePayload, ChatPayload, GameEventPayload, SyncPayload } from "@/lib/p2p";
+import type {
+  MovePayload,
+  ChatPayload,
+  GameEventPayload,
+  SyncPayload,
+  HistoryPayload,
+  HistorySyncPayload,
+  GameLogEvent,
+  RolePayload,
+} from "@/lib/p2p";
 import { validateFen } from "@/lib/chess-engine";
 import { getGameStatus } from "@/lib/chess-engine";
 import { useUserStore, useGameStore, useUIStore } from "@/lib/store";
 import { updateEloAfterGame } from "@/lib/elo";
+import { buildPgn, lichessAnalysisUrl } from "@/lib/pgn";
 import { GameChessBoard } from "@/components/game/ChessBoard";
 import { MoveHistory } from "@/components/game/MoveHistory";
 import { GameChat } from "@/components/game/Chat";
@@ -40,13 +50,19 @@ function GameContent() {
   const searchParams = useSearchParams();
   const roomId = searchParams.get("room") ?? "";
   const colorParam = searchParams.get("color") as "w" | "b" | null;
-  const myColor = colorParam === "w" || colorParam === "b" ? colorParam : "w";
+  const spectateParam = searchParams.get("spectate");
+  const isSpectator =
+    spectateParam === "1" ||
+    spectateParam === "true" ||
+    (!!roomId && colorParam !== "w" && colorParam !== "b");
+  const myColor =
+    isSpectator ? null : (colorParam === "w" || colorParam === "b" ? colorParam : "w");
   const oppEloParam = searchParams.get("oppElo");
   const oppNameParam = searchParams.get("oppName");
   const opponentEloFromUrl = oppEloParam ? parseInt(oppEloParam, 10) : null;
   const opponentNameFromUrl = oppNameParam ?? null;
 
-  const { elo } = useUserStore();
+  const { elo, name: myName } = useUserStore();
   const {
     fen,
     myColor: storedColor,
@@ -58,12 +74,20 @@ function GameContent() {
     setDrawOfferFrom,
     resetGame,
     moveHistory,
+    gameEventLog,
+    setGameEventLog,
+    appendGameLogEvent,
+    setWhitePeerId,
+    setBlackPeerId,
+    whitePeerId,
+    blackPeerId,
     chatMessages,
     result,
     whiteTimeMs,
     blackTimeMs,
     drawOfferFrom,
     opponentElo,
+    opponentName,
   } = useGameStore();
   const { theme: chessTheme } = useUIStore();
 
@@ -96,13 +120,32 @@ function GameContent() {
 
     const run = async () => {
       const room = await getGameRoom(roomId);
+      const selfId = (await import("trystero/torrent")).selfId;
+      const ourRole: RolePayload = isSpectator
+        ? { role: "spectator", peerId: selfId }
+        : { role: "player", color: myColor ?? "w", peerId: selfId };
       const [sendMove, getMove] = room.makeAction("move");
       const [sendChat, getChat] = room.makeAction("chat");
       const [sendGameEvent, getGameEvent] = room.makeAction("gameEvent");
       const [sendSync, getSync] = room.makeAction("sync");
+      const [sendHistory, getHistory] = room.makeAction("history");
+      const [sendHistSync, getHistSync] = room.makeAction("histSync");
+      const [sendRole, getRole] = room.makeAction("role");
+
+      getRole((data, peerId) => {
+        if (!mounted) return;
+        const payload = data as RolePayload | null;
+        if (!payload || payload.peerId !== peerId) return;
+        if (payload.role === "player" && payload.color === "w") setWhitePeerId(peerId);
+        if (payload.role === "player" && payload.color === "b") setBlackPeerId(peerId);
+      });
 
       getMove((data, peerId) => {
         if (!mounted) return;
+        const { whitePeerId: w, blackPeerId: b } = useGameStore.getState();
+        if (w != null && b != null && peerId !== w && peerId !== b) return;
+        const logLen = useGameStore.getState().gameEventLog.length;
+        if (logLen > 0) return;
         const payload = data as MovePayload | null;
         if (payload && validateFen(payload.fen)) {
           setFen(payload.fen);
@@ -118,6 +161,10 @@ function GameContent() {
 
       getGameEvent((data, peerId) => {
         if (!mounted) return;
+        const { whitePeerId: w, blackPeerId: b } = useGameStore.getState();
+        if (w != null && b != null && peerId !== w && peerId !== b) return;
+        const logLen = useGameStore.getState().gameEventLog.length;
+        if (logLen > 0) return;
         const payload = data as GameEventPayload | null;
         if (!payload) return;
         if (payload.type === "resign") {
@@ -137,16 +184,58 @@ function GameContent() {
 
       getSync((data) => {
         if (!mounted) return;
+        const logLen = useGameStore.getState().gameEventLog.length;
+        if (logLen > 0) return;
         const payload = data as SyncPayload | null;
         if (payload && validateFen(payload.fen)) setFen(payload.fen);
       });
 
+      getHistory((data) => {
+        if (!mounted) return;
+        const payload = data as HistoryPayload | null;
+        if (!payload || typeof payload.seq !== "number") return;
+        const log = useGameStore.getState().gameEventLog;
+        if (payload.seq !== log.length + 1) return;
+        appendGameLogEvent(payload as GameLogEvent);
+        if (
+          (payload as GameLogEvent).kind === "resign" ||
+          (payload as GameLogEvent).kind === "drawAccept"
+        )
+          setShowResultDialog(true);
+      });
+
+      getHistSync((data) => {
+        if (!mounted) return;
+        const payload = data as HistorySyncPayload | null;
+        if (!payload || !Array.isArray(payload.events)) return;
+        if (payload.events.length === 0) return;
+        setGameEventLog(payload.events);
+        const last = payload.events[payload.events.length - 1];
+        if (last.kind === "resign" || last.kind === "drawAccept")
+          setShowResultDialog(true);
+      });
+
+      const peers = room.getPeers();
+      Object.keys(peers).forEach((pid) => {
+        (sendRole as (d: unknown, p: string) => void)(ourRole, pid);
+      });
+      if (!isSpectator && myColor === "w") setWhitePeerId(selfId);
+      if (!isSpectator && myColor === "b") setBlackPeerId(selfId);
+
       room.onPeerJoin((peerId) => {
         if (!mounted) return;
-        useGameStore.setState({ opponentId: peerId });
+        useGameStore.setState((s) => ({ opponentId: s.opponentId ?? peerId }));
+        (sendRole as (d: unknown, p: string) => void)(ourRole, peerId);
+        const log = useGameStore.getState().gameEventLog;
         if (myColor === "w") {
           (sendSync as (d: unknown, p: string) => void)(
             { type: "sync", fen: INITIAL_FEN, timestamp: Date.now() },
+            peerId
+          );
+        }
+        if (log.length > 0) {
+          (sendHistSync as (d: unknown, p: string) => void)(
+            { events: log },
             peerId
           );
         }
@@ -172,29 +261,56 @@ function GameContent() {
       mounted = false;
       leaveRoom(gameRoomId);
     };
-  }, [roomId, myColor]);
+  }, [roomId, myColor, isSpectator, setWhitePeerId, setBlackPeerId]);
+
+  const broadcastHistory = React.useCallback(
+    async (event: GameLogEvent) => {
+      const room = await getGameRoom(roomId);
+      const [sendHistory] = room.makeAction("history");
+      const peers = room.getPeers();
+      Object.keys(peers).forEach((pid) => {
+        (sendHistory as (d: unknown, p: string) => void)(event, pid);
+      });
+    },
+    [roomId]
+  );
 
   const sendMoveToOpponent = React.useCallback(
     async (newFen: string, san?: string) => {
+      if (isSpectator) return;
       const room = await getGameRoom(roomId);
       const [sendMove] = room.makeAction("move");
       const peers = room.getPeers();
       const peerIds = Object.keys(peers);
+      const ts = Date.now();
+      const nextSeq = useGameStore.getState().gameEventLog.length + 1;
+      const historyEvent: GameLogEvent = {
+        seq: nextSeq,
+        kind: "move",
+        fen: newFen,
+        san: san ?? "",
+        timestamp: ts,
+      };
+      appendGameLogEvent(historyEvent);
+      broadcastHistory(historyEvent);
       if (peerIds.length > 0) {
         const payload: Record<string, unknown> = {
           type: "move",
           fen: newFen,
           san: san ?? "",
-          timestamp: Date.now(),
+          timestamp: ts,
         };
-        (sendMove as (d: unknown, p: string) => void)(payload, peerIds[0]);
+        peerIds.forEach((pid) => {
+          (sendMove as (d: unknown, p: string) => void)(payload, pid);
+        });
       }
     },
-    [roomId]
+    [roomId, appendGameLogEvent, broadcastHistory, isSpectator]
   );
 
   const handleMove = React.useCallback(
     (newFen: string, san?: string) => {
+      if (isSpectator) return;
       setFen(newFen);
       if (san) addMove(san);
       sendMoveToOpponent(newFen, san);
@@ -209,61 +325,86 @@ function GameContent() {
         setShowResultDialog(true);
       }
     },
-    [setFen, addMove, sendMoveToOpponent, myColor, setResult]
+    [setFen, addMove, sendMoveToOpponent, myColor, setResult, isSpectator]
   );
 
   const handleResign = React.useCallback(async () => {
+    if (isSpectator) return;
     const room = await getGameRoom(roomId);
     const [sendGameEvent] = room.makeAction("gameEvent");
     const peers = room.getPeers();
+    const ts = Date.now();
+    const nextSeq = useGameStore.getState().gameEventLog.length + 1;
+    const historyEvent: GameLogEvent = { seq: nextSeq, kind: "resign", timestamp: ts };
+    appendGameLogEvent(historyEvent);
+    broadcastHistory(historyEvent);
     Object.keys(peers).forEach((pid) => {
       (sendGameEvent as (d: unknown, p: string) => void)(
-        { type: "resign", timestamp: Date.now() },
+        { type: "resign", timestamp: ts },
         pid
       );
     });
     setResult("loss");
     setShowResultDialog(true);
-  }, [roomId, setResult]);
+  }, [roomId, setResult, appendGameLogEvent, broadcastHistory, isSpectator]);
 
   const handleDrawOffer = React.useCallback(async () => {
+    if (isSpectator) return;
     const room = await getGameRoom(roomId);
     const [sendGameEvent] = room.makeAction("gameEvent");
     const peers = room.getPeers();
+    const ts = Date.now();
+    const nextSeq = useGameStore.getState().gameEventLog.length + 1;
+    const historyEvent: GameLogEvent = { seq: nextSeq, kind: "drawOffer", timestamp: ts };
+    appendGameLogEvent(historyEvent);
+    broadcastHistory(historyEvent);
     Object.keys(peers).forEach((pid) => {
       (sendGameEvent as (d: unknown, p: string) => void)(
-        { type: "drawOffer", timestamp: Date.now() },
+        { type: "drawOffer", timestamp: ts },
         pid
       );
     });
-  }, [roomId]);
+  }, [roomId, appendGameLogEvent, broadcastHistory, isSpectator]);
 
   const handleAcceptDraw = React.useCallback(async () => {
+    if (isSpectator) return;
     const room = await getGameRoom(roomId);
     const [sendGameEvent] = room.makeAction("gameEvent");
     const peers = room.getPeers();
+    const ts = Date.now();
+    const nextSeq = useGameStore.getState().gameEventLog.length + 1;
+    const historyEvent: GameLogEvent = { seq: nextSeq, kind: "drawAccept", timestamp: ts };
+    appendGameLogEvent(historyEvent);
+    broadcastHistory(historyEvent);
     Object.keys(peers).forEach((pid) => {
       (sendGameEvent as (d: unknown, p: string) => void)(
-        { type: "drawAccept", timestamp: Date.now() },
+        { type: "drawAccept", timestamp: ts },
         pid
       );
     });
     setDrawOfferFrom(null);
     setResult("draw");
     setShowResultDialog(true);
-  }, [roomId, setResult, setDrawOfferFrom]);
+  }, [roomId, setResult, setDrawOfferFrom, appendGameLogEvent, broadcastHistory, isSpectator]);
 
   const handleDeclineDraw = React.useCallback(async () => {
+    if (isSpectator) return;
     const room = await getGameRoom(roomId);
     const [sendGameEvent] = room.makeAction("gameEvent");
-    if (drawOfferFrom) {
+    const ts = Date.now();
+    const nextSeq = useGameStore.getState().gameEventLog.length + 1;
+    const historyEvent: GameLogEvent = { seq: nextSeq, kind: "drawDecline", timestamp: ts };
+    appendGameLogEvent(historyEvent);
+    broadcastHistory(historyEvent);
+    const peers = room.getPeers();
+    Object.keys(peers).forEach((pid) => {
       (sendGameEvent as (d: unknown, p: string) => void)(
-        { type: "drawDecline", timestamp: Date.now() },
-        drawOfferFrom
+        { type: "drawDecline", timestamp: ts },
+        pid
       );
-    }
+    });
     setDrawOfferFrom(null);
-  }, [roomId, drawOfferFrom, setDrawOfferFrom]);
+  }, [roomId, setDrawOfferFrom, appendGameLogEvent, broadcastHistory, isSpectator]);
 
   const handleChatSend = React.useCallback(
     async (text: string) => {
@@ -292,18 +433,45 @@ function GameContent() {
   );
 
   React.useEffect(() => {
-    if (!result || eloUpdatedRef.current) return;
+    if (isSpectator || !result || eloUpdatedRef.current) return;
     eloUpdatedRef.current = true;
     const oppElo = opponentElo ?? opponentEloFromUrl ?? 1200;
     updateEloAfterGame(elo, oppElo, result, roomId, fen).then((change) => {
       setEloChange(change.elo - elo);
       useUserStore.setState({ elo: change.elo, peakElo: change.peakElo });
     });
-  }, [result, opponentElo, opponentEloFromUrl, elo, roomId, fen]);
+  }, [result, opponentElo, opponentEloFromUrl, elo, roomId, fen, isSpectator]);
 
   const handleCopyFen = React.useCallback(() => {
     navigator.clipboard.writeText(fen);
   }, [fen]);
+
+  const pgn = React.useMemo(
+    () =>
+      buildPgn({
+        moveHistory,
+        result,
+        whiteName:
+          storedColor === "w"
+            ? (myName?.trim() || "White")
+            : storedColor === "b"
+              ? (opponentName ?? "White")
+              : "White",
+        blackName:
+          storedColor === "b"
+            ? (myName?.trim() || "Black")
+            : storedColor === "w"
+              ? (opponentName ?? "Black")
+              : "Black",
+      }),
+    [moveHistory, result, storedColor, myName, opponentName]
+  );
+
+  const handleCopyPgn = React.useCallback(() => {
+    navigator.clipboard.writeText(pgn);
+  }, [pgn]);
+
+  const lichessUrl = React.useMemo(() => lichessAnalysisUrl(pgn), [pgn]);
 
   if (!roomId) {
     return (
@@ -318,9 +486,14 @@ function GameContent() {
     <main className="min-h-screen p-4">
       <div className="mx-auto max-w-4xl">
         <div className="mb-4 flex items-center justify-between">
-          <Link href="/" className="text-muted-foreground hover:text-foreground">
-            ← Exit
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/" className="text-muted-foreground hover:text-foreground">
+              ← Exit
+            </Link>
+            {isSpectator && (
+              <span className="text-sm text-muted-foreground">Spectating</span>
+            )}
+          </div>
           <GameTimer
             whiteTimeMs={whiteTimeMs}
             blackTimeMs={blackTimeMs}
@@ -334,29 +507,31 @@ function GameContent() {
           <div className="flex flex-col items-center">
             <GameChessBoard
               fen={fen}
-              orientation={myColor === "w" ? "white" : "black"}
+              orientation={storedColor === "w" ? "white" : storedColor === "b" ? "black" : "white"}
               onMove={handleMove}
-              disabled={!isMyTurn || !!isGameOver}
+              disabled={isSpectator || !isMyTurn || !!isGameOver}
               theme={chessTheme}
             />
-            <div className="mt-4 flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleResign}>
-                Resign
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDrawOffer}>
-                Offer Draw
-              </Button>
-              {drawOfferFrom && (
-                <>
-                  <Button size="sm" onClick={handleAcceptDraw}>
-                    Accept Draw
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleDeclineDraw}>
-                    Decline
-                  </Button>
-                </>
-              )}
-            </div>
+            {!isSpectator && (
+              <div className="mt-4 flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleResign}>
+                  Resign
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDrawOffer}>
+                  Offer Draw
+                </Button>
+                {drawOfferFrom && (
+                  <>
+                    <Button size="sm" onClick={handleAcceptDraw}>
+                      Accept Draw
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleDeclineDraw}>
+                      Decline
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex-1 space-y-4">
@@ -370,26 +545,46 @@ function GameContent() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {result === "win"
-                ? "You Win!"
-                : result === "loss"
-                  ? "You Lose"
-                  : "Draw"}
+              {isSpectator
+                ? (result === "draw"
+                    ? "Draw"
+                    : result === "win"
+                      ? "White wins"
+                      : result === "loss"
+                        ? "Black wins"
+                        : gameEventLog.length > 0 && gameEventLog[gameEventLog.length - 1].kind === "resign"
+                          ? (getGameStatus(fen).turn === "w" ? "Black wins" : "White wins")
+                          : "Game over")
+                : result === "win"
+                  ? "You Win!"
+                  : result === "loss"
+                    ? "You Lose"
+                    : "Draw"}
             </DialogTitle>
           </DialogHeader>
           <p>
-            {result === "win" && "Congratulations!"}
-            {result === "loss" && "Better luck next time."}
-            {result === "draw" && "The game is a draw."}
+            {!isSpectator && result === "win" && "Congratulations!"}
+            {!isSpectator && result === "loss" && "Better luck next time."}
+            {(isSpectator || result === "draw") && "The game is a draw."}
           </p>
-          {eloChange != null && eloChange !== 0 && (
+          {!isSpectator && eloChange != null && eloChange !== 0 && (
             <p className="text-muted-foreground">
               ELO {eloChange > 0 ? "+" : ""}
               {eloChange}
             </p>
           )}
-          <DialogFooter>
-            <Button onClick={handleCopyFen}>Copy FEN</Button>
+          <DialogFooter className="flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={handleCopyFen}>
+              Copy FEN
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleCopyPgn}>
+              Copy PGN
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href={lichessUrl} target="_blank" rel="noopener noreferrer">
+                Analyze on Lichess
+              </a>
+            </Button>
             <Button asChild>
               <Link href="/" onClick={() => { resetGame(); setShowResultDialog(false); }}>
                 Back to Home

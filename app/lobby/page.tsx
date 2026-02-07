@@ -77,7 +77,7 @@ function LobbyContent() {
       const [sendHeartbeat, getHeartbeat] = room.makeAction("heartbeat");
       const [sendChallenge, getChallenge] = room.makeAction("challenge");
       const [sendChallengeResponse, getChallengeResponse] =
-        room.makeAction("challengeResponse");
+        room.makeAction("challResp");
 
       getHeartbeat((data: unknown, peerId: string) => {
         if (!mounted) return;
@@ -112,6 +112,7 @@ function LobbyContent() {
         if (d.type === "accept") {
           const peer = useLobbyStore.getState().peers.find((p) => p.id === peerId);
           const params = new URLSearchParams({
+            room: d.gameId,
             color: "w",
             oppElo: String(peer?.elo ?? 1200),
             oppName: peer?.name ?? "Opponent",
@@ -128,7 +129,7 @@ function LobbyContent() {
         sendHeartbeat({
           id: uuidv4(),
           elo,
-          name,
+          name: name.trim() || "Player",
           ready: true,
           timestamp: Date.now(),
         });
@@ -155,11 +156,14 @@ function LobbyContent() {
     };
   }, [roomParam, elo, name, addOrUpdatePeer, removePeer, setPendingChallenge]);
 
+  const [showAllPeers, setShowAllPeers] = React.useState(false);
+
   const filteredPeers = React.useMemo(() => {
-    return peers
-      .filter((p) => Math.abs(p.elo - elo) <= ELO_RANGE)
-      .slice(0, MAX_PEERS_DISPLAYED);
-  }, [peers, elo]);
+    const byElo = showAllPeers
+      ? peers
+      : peers.filter((p) => Math.abs(p.elo - elo) <= ELO_RANGE);
+    return byElo.slice(0, MAX_PEERS_DISPLAYED);
+  }, [peers, elo, showAllPeers]);
 
   const [waitingForGameId, setWaitingForGameId] = React.useState<string | null>(
     null
@@ -177,7 +181,7 @@ function LobbyContent() {
           type: "challenge",
           gameId,
           challengerId: "self",
-          challengerName: name,
+          challengerName: name.trim() || "Player",
           challengerElo: elo,
           color: "w",
           timestamp: Date.now(),
@@ -191,7 +195,7 @@ function LobbyContent() {
   const handleAcceptChallenge = React.useCallback(async () => {
     if (!pendingChallenge) return;
     const room = await getLobbyRoom();
-    const [sendResponse] = room.makeAction("challengeResponse");
+    const [sendResponse] = room.makeAction("challResp");
     sendResponse(
       { type: "accept", gameId: pendingChallenge.gameId, timestamp: Date.now() },
       pendingChallenge.challengerId
@@ -209,7 +213,7 @@ function LobbyContent() {
   const handleDeclineChallenge = React.useCallback(async () => {
     if (!pendingChallenge) return;
     const room = await getLobbyRoom();
-    const [sendResponse] = room.makeAction("challengeResponse");
+    const [sendResponse] = room.makeAction("challResp");
     sendResponse(
       {
         type: "decline",
@@ -239,14 +243,19 @@ function LobbyContent() {
             <CardTitle>Lobby</CardTitle>
             <p className="text-sm text-muted-foreground">
               Your ELO: {elo} · Peak: {peakElo}
+              {name.trim() ? ` · Playing as ${name.trim()}` : ""}
             </p>
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <label className="text-sm font-medium">Username</label>
               <Input
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
+                onChange={(e) => setName(e.target.value.slice(0, 30))}
+                placeholder="e.g. HKTITAN"
                 className="max-w-[200px]"
+                maxLength={30}
+                title="Visible to others in the lobby"
               />
+              <span className="text-xs text-muted-foreground">Visible to others in the lobby</span>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -291,14 +300,23 @@ function LobbyContent() {
             )}
 
             <div>
-              <p className="mb-2 text-sm font-medium">
-                Peers (ELO ±{ELO_RANGE})
-              </p>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium">
+                  {showAllPeers ? "Peers (all)" : `Peers (ELO ±${ELO_RANGE})`}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllPeers((v) => !v)}
+                >
+                  {showAllPeers ? "Show ELO ±" + ELO_RANGE : "Show all peers"}
+                </Button>
+              </div>
               {loading ? (
                 <p className="text-muted-foreground">Connecting…</p>
               ) : filteredPeers.length === 0 ? (
                 <p className="text-muted-foreground">
-                  No peers in range. Open another tab or share the link.
+                  {showAllPeers ? "No peers in lobby yet. Open another tab or share the link." : "No peers in range. Open another tab or share the link."}
                 </p>
               ) : (
                 <ul className="space-y-2">

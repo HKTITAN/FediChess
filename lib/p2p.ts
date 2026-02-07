@@ -3,6 +3,7 @@ import {
   P2P_TRACKERS,
   LOBBY_ROOM,
   NAT_RETRY_COUNT,
+  getIceServers,
 } from "./constants";
 
 export type { Room } from "trystero/torrent";
@@ -57,6 +58,29 @@ export interface SyncPayload {
   timestamp: number;
 }
 
+/** Single event in the shared game log (append-only, seq is version). */
+export type GameLogEvent =
+  | { seq: number; kind: "move"; fen: string; san?: string; timestamp: number }
+  | { seq: number; kind: "resign"; timestamp: number }
+  | { seq: number; kind: "drawOffer"; timestamp: number }
+  | { seq: number; kind: "drawAccept"; timestamp: number }
+  | { seq: number; kind: "drawDecline"; timestamp: number };
+
+/** Payload for "history" action: one new event. */
+export type HistoryPayload = GameLogEvent;
+
+/** Payload for "histSync" action (≤12 bytes): full log for late joiners. */
+export interface HistorySyncPayload {
+  events: GameLogEvent[];
+}
+
+/** Payload for "role" action: announce player or spectator. */
+export interface RolePayload {
+  role: "player" | "spectator";
+  color?: "w" | "b";
+  peerId: string;
+}
+
 const TRACKERS = P2P_TRACKERS as unknown as string[];
 
 let roomCache: Map<string, import("trystero/torrent").Room> = new Map();
@@ -66,11 +90,13 @@ export async function getRoom(roomId: string): Promise<import("trystero/torrent"
   if (cached) return cached;
 
   const { joinRoom } = await import("trystero/torrent");
+  const iceServers = getIceServers();
   const room = joinRoom(
     {
       appId: P2P_APP_ID,
       relayUrls: TRACKERS,
       relayRedundancy: Math.min(3, TRACKERS.length),
+      ...(iceServers.length > 0 && { rtcConfig: { iceServers } }),
     },
     roomId
   );
