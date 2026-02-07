@@ -13,7 +13,7 @@ Steps:
 
 1. Checkout the repository
 2. Set up Node.js 20 (with npm cache)
-3. `npm ci` — install dependencies
+3. `npm install` — install dependencies (CI uses install for lockfile compatibility across npm versions; use `npm ci` locally when possible)
 4. `npm run lint` — ESLint (Next.js config)
 5. `npm run build` — production Next.js build (static export)
 
