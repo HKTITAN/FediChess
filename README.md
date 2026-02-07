@@ -1,5 +1,7 @@
 # FediChess
 
+[![GitHub](https://img.shields.io/badge/GitHub-FediChess-24292f?style=flat&logo=github)](https://github.com/HKTITAN/FediChess) [![version](https://img.shields.io/badge/version-0.3.0-blue)](https://github.com/HKTITAN/FediChess/releases)
+
 **Decentralized peer-to-peer chess in the browser — the fediverse of chess.** Play with anyone over the web without a central game server, or **nearby over BLE** with no internet. Same [open wire protocol](documentation/protocol.md) over **WebRTC** (online) and **BLE** (local); build your own client and interoperate. Matchmaking uses public WebTorrent trackers for online play; moves and chat go directly between peers.
 
 **Version:** 0.3.0 — see [CHANGELOG](CHANGELOG.md) for release history.
@@ -377,3 +379,9 @@ FediChess is **open source** (MIT). This repository contains the web app, wire p
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=HKTITAN/FediChess&type=Date)](https://star-history.com/#HKTITAN/FediChess&Date)

@@ -3,6 +3,7 @@ import { Instrument_Serif } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { AppFooter } from "@/components/app-footer";
 import "./globals.css";
 
 const instrumentSerif = Instrument_Serif({
@@ -42,9 +43,14 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen antialiased bg-background text-foreground font-sans">
+      <body className="flex min-h-screen flex-col antialiased bg-background text-foreground font-sans">
         <ErrorBoundary>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <div className="flex min-h-screen flex-col">
+              <div className="flex-1">{children}</div>
+              <AppFooter />
+            </div>
+          </ThemeProvider>
         </ErrorBoundary>
         <Analytics />
       </body>

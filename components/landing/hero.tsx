@@ -16,6 +16,7 @@ export function Hero() {
   const { theme: chessTheme, setTheme: setChessTheme } = useUIStore();
   const { theme: colorTheme, setTheme: setColorTheme } = useTheme();
   const [copied, setCopied] = React.useState(false);
+  const [copyFailed, setCopyFailed] = React.useState(false);
 
   React.useEffect(() => {
     hydrateFromStorage();
@@ -23,13 +24,20 @@ export function Hero() {
 
   const handleCopyLink = React.useCallback(async () => {
     const link = getShareableLink(LOBBY_ROOM, elo);
-    await copyToClipboard(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (!link) return;
+    setCopyFailed(false);
+    const ok = await copyToClipboard(link);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 2000);
+    }
   }, [elo]);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4">
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6">
       {/* Secondary actions in a compact tray: one primary focus (Play) below */}
       <div className="absolute top-4 right-4 flex flex-wrap items-center gap-2 rounded-lg border border-border/50 bg-background/80 px-2 py-1.5 backdrop-blur-sm">
         <Link
@@ -58,21 +66,23 @@ export function Hero() {
         </button>
       </div>
 
-      <h1 className="font-instrument text-4xl font-bold tracking-tight md:text-5xl">
-        FediChess
-      </h1>
-      <p className="mt-2 text-muted-foreground">
-        No servers. Peer-to-peer over WebRTC. Match with players near your ELO.
-      </p>
+      <div className="mx-auto w-full max-w-2xl text-center">
+        <h1 className="font-instrument text-4xl font-bold tracking-tight md:text-5xl">
+          FediChess
+        </h1>
+        <p className="mt-2 text-muted-foreground text-sm sm:text-base">
+          No servers. Peer-to-peer over WebRTC. Match with players near your ELO.
+        </p>
+      </div>
 
-      <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+      <div className="mt-8 flex w-full max-w-md flex-col gap-4 sm:flex-row sm:justify-center">
         <Button size="lg" asChild className="min-h-[44px] min-w-[44px] transition-transform duration-200 hover:scale-[1.02]">
           <Link href={`/lobby?room=${encodeURIComponent(LOBBY_ROOM)}#elo=${elo}`}>
             Play Random
           </Link>
         </Button>
         <Button variant="outline" size="lg" onClick={handleCopyLink} className="min-h-[44px] min-w-[44px]">
-          {copied ? "Copied!" : "Copy Link"}
+          {copied ? "Copied!" : copyFailed ? "Copy failed" : "Copy Link"}
         </Button>
         <Button variant="secondary" size="lg" asChild className="min-h-[44px] min-w-[44px]">
           <Link href="/local">Local AI</Link>

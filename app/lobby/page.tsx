@@ -412,10 +412,10 @@ function LobbyContent() {
     <main className="min-h-screen p-4">
       <div className="mx-auto max-w-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <Link href="/" className="text-muted-foreground hover:text-foreground">
+          <Link href="/" className="inline-flex min-h-[44px] min-w-[44px] items-center text-muted-foreground hover:text-foreground">
             ← Back
           </Link>
-          <Link href="/settings" className="text-muted-foreground hover:text-foreground">
+          <Link href="/settings" className="inline-flex min-h-[44px] min-w-[44px] items-center text-muted-foreground hover:text-foreground">
             Backup account
           </Link>
         </div>

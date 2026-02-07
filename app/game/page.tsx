@@ -553,7 +553,7 @@ function GameContent() {
       <div className="mx-auto max-w-4xl">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Link href="/" className="text-muted-foreground hover:text-foreground">
+            <Link href="/" className="inline-flex min-h-[44px] min-w-[44px] items-center text-muted-foreground hover:text-foreground">
               ← Exit
             </Link>
             {isSpectator && (
@@ -603,7 +603,7 @@ function GameContent() {
             )}
           </div>
 
-          <div className="flex-1 space-y-4">
+          <div className="min-w-0 flex-1 space-y-4">
             <MoveHistory moves={moveHistory} />
             <GameChat messages={chatMessages} onSend={handleChatSend} />
           </div>

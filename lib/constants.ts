@@ -39,6 +39,9 @@ export function getIceServers(): Array<{ urls: string | string[]; username?: str
   return servers;
 }
 
+/** App version (keep in sync with package.json). */
+export const APP_VERSION = "0.3.0";
+
 /** App ID shared by all FediChess clients (Trystero room namespace). */
 export const P2P_APP_ID = "p2p-chess-v1";
 

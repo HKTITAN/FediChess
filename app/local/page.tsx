@@ -48,22 +48,24 @@ export default function LocalAIPage() {
   const status = getGameStatus(fen);
   const isPlayerTurn = status.turn === "w";
 
-  const makeAIMove = React.useCallback(async () => {
-    if (!isPlayerTurn || status.isCheckmate || status.isDraw) return;
+  /** Run AI move from the given FEN (must be Black to play). */
+  const makeAIMove = React.useCallback(async (fenBlackToPlay: string) => {
+    const s = getGameStatus(fenBlackToPlay);
+    if (s.turn !== "b" || s.isCheckmate || s.isDraw) return;
     setThinking(true);
-    const uci = await getBestMove(fen);
+    const uci = await getBestMove(fenBlackToPlay);
     setThinking(false);
     if (!uci) return;
     const from = uci.slice(0, 2);
     const to = uci.slice(2, 4);
     const promo = uci.length === 5 ? (uci[4] as "q" | "r" | "b" | "n") : undefined;
-    const moveResult = makeMove(fen, from, to, promo);
+    const moveResult = makeMove(fenBlackToPlay, from, to, promo);
     if (moveResult.success) {
       setFen(moveResult.fen);
       if (moveResult.isCheckmate) setResult("You win!");
       else if (moveResult.isDraw || moveResult.isStalemate) setResult("Draw");
     }
-  }, [fen, isPlayerTurn, status.isCheckmate, status.isDraw]);
+  }, []);
 
   const onDrop = React.useCallback(
     (source: string, target: string) => {
@@ -72,7 +74,7 @@ export default function LocalAIPage() {
         setFen(moveResult.fen);
         if (moveResult.isCheckmate) setResult("AI wins!");
         else if (moveResult.isDraw || moveResult.isStalemate) setResult("Draw");
-        else setTimeout(makeAIMove, 300);
+        else setTimeout(() => makeAIMove(moveResult.fen), 300);
         return true;
       }
       return false;
@@ -84,7 +86,7 @@ export default function LocalAIPage() {
     <main className="min-h-screen p-4">
       <div className="mx-auto max-w-lg">
         <div className="mb-4 flex items-center justify-between">
-          <Link href="/" className="text-muted-foreground hover:text-foreground">
+          <Link href="/" className="inline-flex min-h-[44px] min-w-[44px] items-center text-muted-foreground hover:text-foreground">
             ← Back
           </Link>
           <span className="text-sm text-muted-foreground">
