@@ -30,3 +30,4 @@ __pycache__/
 .eggs/
 sdks/rust/target/
 sdks/cpp/build/
+.vercel
